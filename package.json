@@ -1,0 +1,27 @@
+{
+  "name": "lydias-flow",
+  "productName": "Lydia's Flow",
+  "version": "0.1.0",
+  "description": "Push-to-talk dictation for macOS that runs entirely on your Mac.",
+  "license": "MIT",
+  "author": "Lydia Miller",
+  "private": true,
+  "main": "src/main/main.js",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "setup": "node scripts/build-native.js && node scripts/download-engines.js && node scripts/download-models.js",
+    "start": "env -u ELECTRON_RUN_AS_NODE electron .",
+    "test": "node --test test/",
+    "prove-offline": "node scripts/prove-offline.js",
+    "build": "electron-builder --mac --arm64"
+  },
+  "dependencies": {
+    "ws": "8.21.0"
+  },
+  "devDependencies": {
+    "electron": "43.8.3",
+    "electron-builder": "26.4.0"
+  }
+}

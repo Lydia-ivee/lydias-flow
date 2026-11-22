@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Downloaded at setup, never committed (large, and each has its own licence)
+engines/
+models/
+
+# Compiled native helpers
+bin/
+
+# Build output
+dist/
+
+# Local secrets and machine files (this app needs no keys, but just in case)
+.env
+.env.*
+*.pem
+.DS_Store
+*.log
