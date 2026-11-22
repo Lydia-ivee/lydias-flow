@@ -1,0 +1,38 @@
+# Runs on every push and pull request, on a real Apple Silicon Mac.
+#
+# The end-to-end engine test is skipped here because it needs ~1.9 GB of
+# models; everything else runs, including compiling the Swift key listener.
+
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+# Read-only: this workflow can look at the code, never change it.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      # Actions are pinned to an exact commit, not a movable tag like "v7",
+      # so the code that runs here cannot change without a commit to this file.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1" # the tests never start Electron
+
+      - name: Compile the Swift key listener
+        run: node scripts/build-native.js
+
+      - name: Test
+        run: npm test

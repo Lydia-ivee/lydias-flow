@@ -1,5 +1,7 @@
 # Lydia's Flow
 
+[![Tests](https://github.com/Lydia-ivee/lydias-flow/actions/workflows/test.yml/badge.svg)](https://github.com/Lydia-ivee/lydias-flow/actions/workflows/test.yml)
+
 Push-to-talk dictation for macOS that runs entirely on your Mac.
 
 Hold a key, speak, let go: your words are transcribed, tidied up and typed
