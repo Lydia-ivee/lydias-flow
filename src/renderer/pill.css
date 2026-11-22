@@ -1,0 +1,67 @@
+body {
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 18px 0 16px;
+  border-radius: 999px;
+  background: rgba(20, 20, 24, 0.92);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* Five bars: heights follow the live microphone level while listening. */
+.bars {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 20px;
+}
+
+.bars span {
+  width: 3px;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  transition: height 80ms linear;
+}
+
+/* While working, the bars ripple on their own. */
+.pill[data-state="working"] .bars span {
+  animation: ripple 900ms ease-in-out infinite;
+}
+.pill[data-state="working"] .bars span:nth-child(2) { animation-delay: 90ms; }
+.pill[data-state="working"] .bars span:nth-child(3) { animation-delay: 180ms; }
+.pill[data-state="working"] .bars span:nth-child(4) { animation-delay: 270ms; }
+.pill[data-state="working"] .bars span:nth-child(5) { animation-delay: 360ms; }
+
+@keyframes ripple {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+.pill[data-state="done"] .bars span {
+  height: 6px;
+  background: var(--accent-2);
+}
+
+.pill[data-state="error"] .bars span {
+  height: 4px;
+  background: var(--warn);
+}
+
+.pill[data-state="error"] .label {
+  color: var(--warn);
+}

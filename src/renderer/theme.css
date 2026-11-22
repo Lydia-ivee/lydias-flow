@@ -1,0 +1,32 @@
+/* Lydia's Flow: shared look. Dark ink, one violet-to-teal accent. */
+:root {
+  --ink: #141418;
+  --ink-raised: #1d1d23;
+  --line: #2c2c35;
+  --text: #f3f2f7;
+  --text-dim: #9a98a6;
+  --accent: #8b7cff;
+  --accent-2: #3fd0c9;
+  --warn: #ffb547;
+  --radius: 14px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  font-family: var(--font);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.gradient-text {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
