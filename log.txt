@@ -1,0 +1,3 @@
+[2026-11-22 18:23:24] [error] handle_read_handshake error: websocketpp.transport:7 (End of File)
+[2026-11-22 18:23:30] [connect] WebSocket Connection 127.0.0.1:51368 v13 "" / 101
+[2026-11-22 18:23:30] [disconnect] Disconnect close local:[1000,Done] remote:[1000,Done]
