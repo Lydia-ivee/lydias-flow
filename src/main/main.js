@@ -25,6 +25,7 @@ const { installNetworkGuard } = require("../shared/networkGuard");
 const { toBritish } = require("../shared/ukSpelling");
 const { makeEntry, wordCount, summarise, parseLines } = require("../shared/stats");
 const { Transcriber } = require("./transcriber");
+const { LivePreview } = require("./livePreview");
 const { Cleaner } = require("./cleaner");
 const { processSpeech } = require("./pipeline");
 const { createPaster } = require("./paste");
@@ -65,6 +66,8 @@ let reportWindow;
 let busy = false; // one dictation at a time
 /** @type {"dictate" | "edit" | null} */
 let mode = null; // "dictate" or "edit" while a key is held
+/** @type {LivePreview | null} */
+let preview = null; // live text while a key is held, if switched on
 
 const paster = createPaster({ clipboard });
 
@@ -86,7 +89,7 @@ function webPreferences() {
 // in the app you were typing in.
 function createPill() {
   pill = new BrowserWindow({
-    width: 240,
+    width: 460, // room for live text
     height: 64,
     show: false,
     frame: false,
@@ -189,7 +192,18 @@ function startKeys() {
     else if (key === settings.editKey) mode = "edit";
     else return;
     showPill(mode === "edit" ? "editing" : "listening");
-    pill.webContents.send("pill:record", { start: true, microphoneId: settings.microphoneId });
+    if (settings.liveText) {
+      preview = new LivePreview({
+        transcribe: (samples) => transcriber.transcribe(samples),
+        onText: (text) => pill.webContents.send("pill:live", text),
+      });
+      preview.start();
+    }
+    pill.webContents.send("pill:record", {
+      start: true,
+      microphoneId: settings.microphoneId,
+      live: settings.liveText,
+    });
   });
   keys.on("up", (key) => {
     const heldKey = mode === "dictate" ? settings.dictateKey : settings.editKey;
@@ -201,10 +215,19 @@ function startKeys() {
 
 // ---- The dictation itself ------------------------------------------------------
 
+// Ends the live preview and waits for its last read, so the final read below
+// has the speech model to itself.
+async function stopPreview() {
+  const ending = preview;
+  preview = null;
+  if (ending) await ending.stop();
+}
+
 /** @param {Float32Array} samples */
 async function handleAudio(samples) {
   const action = mode;
   mode = null;
+  await stopPreview();
   if (!action) return;
   if (samples.length / 16000 < MIN_AUDIO_SECONDS) return pill.hide();
 
@@ -269,8 +292,10 @@ function readReport() {
 // ---- Messages from the windows (see preload.js) ---------------------------------
 
 ipcMain.on("pill:audio", (_event, buffer) => handleAudio(new Float32Array(buffer)));
+ipcMain.on("pill:audio-chunk", (_event, buffer) => preview?.push(new Float32Array(buffer)));
 ipcMain.on("pill:mic-error", () => {
   mode = null;
+  stopPreview();
   showPill("error", "Microphone unavailable");
   hidePillSoon(1800);
 });
