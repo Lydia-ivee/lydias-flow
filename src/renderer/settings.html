@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en-GB">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'" />
+    <title>Lydia's Flow Settings</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="window.css" />
+  </head>
+  <body>
+    <h1><span class="gradient-text">Lydia's Flow</span></h1>
+    <p class="subtitle">Hold a key, speak, let go. Everything stays on this Mac.</p>
+
+    <div class="card">
+      <div class="row">
+        <label for="dictateKey">Hold to dictate<small>Your words, tidied, typed at the cursor</small></label>
+        <select id="dictateKey"></select>
+      </div>
+      <div class="row">
+        <label for="editKey">Hold to edit<small>Select text first, then say the change</small></label>
+        <select id="editKey"></select>
+      </div>
+      <div class="row">
+        <label for="microphoneId">Microphone</label>
+        <select id="microphoneId"></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <label for="cleanup">Tidy up with AI<small>Fixes grammar and punctuation, on this Mac</small></label>
+        <input type="checkbox" class="switch" id="cleanup" />
+      </div>
+      <div class="row">
+        <label for="britishEnglish">British English<small>colour, organise, centre</small></label>
+        <input type="checkbox" class="switch" id="britishEnglish" />
+      </div>
+    </div>
+
+    <p class="tip">
+      Using <kbd>fn</kbd>? Set System Settings › Keyboard › "Press 🌐 key to" to <b>Do Nothing</b>, or it will also
+      open the emoji picker. Keys not responding? Allow Lydia's Flow under
+      <a href="#" id="accessibility">Privacy &amp; Security › Accessibility</a>.
+    </p>
+
+    <button id="report">Open Flow Report</button>
+
+    <script src="settings.js"></script>
+  </body>
+</html>
