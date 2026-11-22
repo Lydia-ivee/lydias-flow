@@ -1,0 +1,20 @@
+{
+  "snippets": [
+    { "trigger": "my sign-off", "text": "Best wishes" },
+    { "trigger": "my address", "text": "1 Example Street" },
+    { "trigger": "my work address", "text": "2 Example Road" },
+    { "trigger": "meeting link", "text": "https://example.com/meet" },
+    { "trigger": "today's date", "text": "{date}" },
+    { "trigger": "out of office", "text": "I'm away until Monday." }
+  ],
+  "commands": [
+    { "spoken": "Insert my sign-off.", "expected": "my sign-off" },
+    { "spoken": "Insert my address.", "expected": "my address" },
+    { "spoken": "Insert my work address.", "expected": "my work address" },
+    { "spoken": "Snippet meeting link.", "expected": "meeting link" },
+    { "spoken": "Insert today's date.", "expected": "today's date" },
+    { "spoken": "Um, insert out of office.", "expected": "out of office" },
+    { "spoken": "Insert a table of the results here.", "expected": null },
+    { "spoken": "Insert the new paragraph after the introduction.", "expected": null }
+  ]
+}

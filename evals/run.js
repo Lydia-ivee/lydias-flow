@@ -15,12 +15,14 @@ const { execFileSync } = require("child_process");
 const { Transcriber } = require("../src/main/transcriber");
 const { Cleaner } = require("../src/main/cleaner");
 const { processDictation } = require("../src/main/pipeline");
+const { matchSnippet } = require("../src/shared/snippets");
 const { speak } = require("./speech");
 const { words, wordErrorRate, countPhrases, percentile, mean } = require("./metrics");
 
 const ROOT = path.join(__dirname, "..");
 const DIRS = { enginesDir: path.join(ROOT, "engines"), modelsDir: path.join(ROOT, "models") };
 const CASES = JSON.parse(fs.readFileSync(path.join(__dirname, "cases.json"), "utf8"));
+const SNIPPETS = JSON.parse(fs.readFileSync(path.join(__dirname, "snippets.json"), "utf8"));
 
 const VOICES = [
   { voice: "Daniel", accent: "British" },
@@ -100,6 +102,8 @@ function scorecard(results) {
     "| Voice | Accent | Speech recognition WER | Final WER (rules + AI) |",
     "|---|---|---|---|",
     ...results.perVoice.map((v) => `| ${v.voice} | ${v.accent} | ${percent(v.speechWer)} | ${percent(v.finalWer)} |`),
+    "",
+    `**Voice snippets:** the right result (the snippet, or nothing for look-alike sentences) in ${percent(results.snippets.correct)} of ${results.snippets.commands} spoken commands; set off by ordinary dictation in ${results.snippets.falseFires} of ${results.snippets.ordinaryClips} clips.`,
   ];
   return lines.join("\n");
 }
@@ -127,6 +131,7 @@ async function main() {
   await cleaner.clean(warm);
 
   const rows = [];
+  const snippetRows = [];
   try {
     for (const { voice, accent } of VOICES) {
       for (const rate of RATES) {
@@ -157,6 +162,14 @@ async function main() {
           });
           process.stdout.write(".");
         }
+
+        // Voice snippets: does "insert <trigger>" type the right one, and do
+        // look-alike sentences ("insert a table...") correctly type nothing?
+        for (const command of SNIPPETS.commands) {
+          const raw = await transcriber.transcribe(speak(command.spoken, { voice, rate }));
+          const matched = matchSnippet(raw, SNIPPETS.snippets);
+          snippetRows.push({ voice, rate, spoken: command.spoken, raw, expected: command.expected, got: matched ? matched.trigger : null });
+        }
       }
       console.log(` ${voice}`);
     }
@@ -175,6 +188,14 @@ async function main() {
       const mine = rows.filter((r) => r.voice === voice);
       return { voice, accent, speechWer: mean(mine.map((r) => r.speechWer)), finalWer: mean(mine.map((r) => r.ai.wer)) };
     }),
+    snippets: {
+      commands: snippetRows.length,
+      correct: snippetRows.filter((r) => r.got === r.expected).length / snippetRows.length,
+      // Ordinary dictation must never set off a snippet.
+      falseFires: rows.filter((r) => matchSnippet(r.raw, SNIPPETS.snippets)).length,
+      ordinaryClips: rows.length,
+      misses: snippetRows.filter((r) => r.got !== r.expected),
+    },
     rows,
   };
 

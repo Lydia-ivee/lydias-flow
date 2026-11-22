@@ -13,6 +13,7 @@ change it. No account, no cloud, no audio leaving your machine.
 - **Dictate anywhere.** Hold `fn` (or a key you choose), speak, release. Text appears at your cursor in any app: email, Slack, a browser, a code editor.
 - **Edit by voice.** Select text, hold the edit key, say "make this more formal" or "shorten this". The selection is rewritten in place.
 - **Tidy, not rewrite.** Filler words go ("um", "you know", "basically"), punctuation is fixed, and nothing you did not say is added. A guard rejects any answer from the AI that contains words you never spoke.
+- **Voice snippets.** Save text once in Settings with a trigger phrase, then say *"insert my sign-off"* to type it. Snippets can include `{date}`, `{time}` and `{clipboard}`. Matching is plain code, not AI: it needs the command word "insert" (or "snippet") first, then a close match to a trigger, so ordinary dictation never sets one off, while a slight mishearing (*"my sign of"*) still works.
 - **British English mode.** Speech models write American spellings; this turns *organize the color of the center* into *organise the colour of the centre*.
 - **Flow Report.** Words dictated this week, your speaking speed against typing, minutes saved, and your favourite filler words. Counts only: your words are never stored.
 - **Offline by design.** The app blocks every network request that is not to itself. Models are downloaded once at setup, never by the running app.
@@ -62,6 +63,7 @@ flowchart LR
 | Speech-to-text | [`src/main/transcriber.js`](src/main/transcriber.js) | NVIDIA Parakeet (0.6B) through sherpa-onnx, running inside the app. |
 | Clean-up | [`src/main/cleaner.js`](src/main/cleaner.js), [`src/shared/prompts.js`](src/shared/prompts.js) | Qwen 3.5 2B on the Mac's GPU via llama.cpp, plus the safety net that decides whether to trust its answer. |
 | Pipeline | [`src/main/pipeline.js`](src/main/pipeline.js) | The order of operations: noise words, AI tidy-up, then British spelling last so the model cannot undo it. |
+| Snippets | [`src/shared/snippets.js`](src/shared/snippets.js) | Command word, then fuzzy matching of the trigger (letter-level edit distance, 75% similarity), then `{date}` / `{time}` / `{clipboard}` filled in. |
 | Paste | [`src/main/paste.js`](src/main/paste.js) | Clipboard plus ⌘V, with your previous clipboard put back afterwards. |
 | Network guard | [`src/shared/networkGuard.js`](src/shared/networkGuard.js) | Every window may only reach `127.0.0.1` and local files. |
 
@@ -89,22 +91,24 @@ Measured on Apple M2, 16 GB, macOS 26.6.2, 2026-11-22.
 
 | | Rules only | Rules + local AI |
 |---|---|---|
-| Word error rate against the ideal text (lower is better) | 13.9% | 9.9% |
-| Filler words removed | 69.7% | 89.5% |
-| British spellings correct | 86.9% | 87.3% |
+| Word error rate against the ideal text (lower is better) | 13.6% | 9.7% |
+| Filler words removed | 69.7% | 89.9% |
+| British spellings correct | 86.5% | 86.5% |
 | Trap prompts typed, not obeyed | 100.0% | 100.0% |
-| Time from letting go to text (median / slowest 5%) | 149 ms / 354 ms | 531 ms / 1150 ms |
+| Time from letting go to text (median / slowest 5%) | 156 ms / 299 ms | 532 ms / 1141 ms |
 
-Speech recognition alone (Parakeet, before any tidying): **6.8%** word error rate.
+Speech recognition alone (Parakeet, before any tidying): **6.9%** word error rate.
 
 | Voice | Accent | Speech recognition WER | Final WER (rules + AI) |
 |---|---|---|---|
-| Daniel | British | 2.0% | 4.8% |
-| Flo (English (UK)) | British | 4.8% | 6.8% |
-| Eddy (English (US)) | American | 0.9% | 4.6% |
-| Karen | Australian | 3.6% | 6.8% |
-| Moira | Irish | 4.8% | 5.5% |
-| Aman | Indian | 24.7% | 31.2% |
+| Daniel | British | 2.1% | 4.7% |
+| Flo (English (UK)) | British | 5.1% | 6.6% |
+| Eddy (English (US)) | American | 0.9% | 5.1% |
+| Karen | Australian | 4.4% | 7.1% |
+| Moira | Irish | 5.7% | 5.5% |
+| Aman | Indian | 23.3% | 29.0% |
+
+**Voice snippets:** the right result (the snippet, or nothing for look-alike sentences) in 91.7% of 96 spoken commands; set off by ordinary dictation in 0 of 240 clips.
 <!-- eval:end -->
 
 ### What the eval caught
@@ -113,6 +117,8 @@ Speech recognition alone (Parakeet, before any tidying): **6.8%** word error rat
 - **The eval was grading itself too kindly.** The trap check looked for "•"; the model had used "\*". A trap now also fails if the output strays from what was said.
 - **Two runs of the same code disagreed.** Speech recognition turned out to be repeatable (the same clip gives the same text 10 times out of 10). The macOS "Aman" voice is not: it produces different audio in different runs. Test audio is now generated once and frozen, so before/after comparisons measure the code, not the test.
 - **The AI step was not repeatable either**: at temperature 0.2, 18 of 240 clips were tidied differently between runs. At temperature 0, two consecutive runs now give identical results for all 240 clips, transcripts and final text alike.
+- **The last word was getting cut off.** Snippet commands came back as *"insert today's d"*: when audio stops straight after the last word, which is what happens when you let go of the key as you finish, the model drops it. Recordings now get half a second of silence added at the end. That is a trade-off, not a free win: it changed 32 of 240 ordinary transcripts (14 better, 18 worse, mostly a spoken "uh" disappearing), but end-to-end accuracy with AI improved slightly and the snippet hit rate rose from 84% to 92%.
+- **A misheard "um" blocked snippets.** *"Um, insert out of office"* was heard as *"Come, insert out of office"*, so the command word was no longer first. One stray word before it is now allowed; false alarms in ordinary dictation stayed at zero.
 
 The Indian English result should be read with care: the frozen "Aman" clips
 score 24.7%, while earlier, different renderings of the same sentences scored
@@ -122,6 +128,7 @@ accent bias.
 ## Limits
 
 - **Apple Silicon Macs only**, and English only.
+- **Some trigger phrases are hard to hear.** *"Today's date"* is often heard as *"the day state"*; triggers made of distinct, ordinary words work best.
 - **Not tested with real voices at scale.** The eval uses synthetic speech; your microphone, room and accent will differ.
 - **Paste uses the clipboard and a simulated ⌘V.** Apps that block synthetic key presses, or password fields, will not receive text. Some Chromium apps occasionally drop a synthetic paste.
 - **The 2B model is a trade-off.** It removes about 90% of filler words and sometimes leaves a "so" or drops a phrase you meant. Turn off "Tidy up with AI" in Settings for rules only (about 0.15 s, no model).
