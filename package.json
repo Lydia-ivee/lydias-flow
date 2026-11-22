@@ -11,7 +11,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "setup": "node scripts/build-native.js && node scripts/download-engines.js && node scripts/download-models.js",
+    "setup": "node scripts/download-engines.js && node scripts/download-models.js",
     "start": "env -u ELECTRON_RUN_AS_NODE electron .",
     "test": "node --test \"test/*.test.js\"",
     "prove-offline": "node scripts/prove-offline.js",
