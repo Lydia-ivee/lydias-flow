@@ -9,7 +9,7 @@ const path = require("path");
 const { Transcriber } = require("../src/main/transcriber");
 const { Cleaner } = require("../src/main/cleaner");
 const { processDictation } = require("../src/main/pipeline");
-const { speak } = require("./helpers/speech");
+const { speak } = require("../evals/speech");
 
 const ROOT = path.join(__dirname, "..");
 const dirs = { enginesDir: path.join(ROOT, "engines"), modelsDir: path.join(ROOT, "models") };

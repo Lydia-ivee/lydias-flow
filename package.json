@@ -14,8 +14,8 @@
     "setup": "node scripts/build-native.js && node scripts/download-engines.js && node scripts/download-models.js",
     "start": "env -u ELECTRON_RUN_AS_NODE electron .",
     "test": "node --test \"test/*.test.js\"",
-    "prove-offline": "node scripts/prove-offline.js",
-    "build": "electron-builder --mac --arm64"
+    "build": "electron-builder --mac --arm64",
+    "eval": "node evals/run.js"
   },
   "dependencies": {
     "sherpa-onnx-node": "2.0.1"
