@@ -15,7 +15,8 @@ const ROOT = path.join(__dirname, "..");
 const dirs = { enginesDir: path.join(ROOT, "engines"), modelsDir: path.join(ROOT, "models") };
 const ready =
   process.platform === "darwin" &&
-  fs.existsSync(path.join(dirs.enginesDir, "sherpa")) &&
+  fs.existsSync(path.join(dirs.enginesDir, "llama", "llama-server")) &&
+  fs.existsSync(path.join(dirs.modelsDir, "parakeet", "tokens.txt")) &&
   fs.existsSync(path.join(dirs.modelsDir, "qwen.gguf"));
 
 test("speech in, tidy British text out, all on this Mac", { skip: !ready && "run npm run setup first", timeout: 180000 }, async () => {

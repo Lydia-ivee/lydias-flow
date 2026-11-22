@@ -61,12 +61,6 @@ function extract(archive, intoDir) {
   else execFileSync("tar", ["-xf", archive, "-C", intoDir]);
 }
 
-// Apple Silicon refuses to run unsigned code. An "ad-hoc" signature is a local
-// self-signature that satisfies that check without an Apple developer account.
-function adHocSign(file) {
-  execFileSync("codesign", ["--force", "--sign", "-", file], { stdio: "ignore" });
-}
-
 // A file being executable is not proof it runs (lesson learned from a broken
 // bundled ffmpeg), so start it once and check it exits cleanly.
 function checkRuns(file, args) {
@@ -76,4 +70,4 @@ function checkRuns(file, args) {
   }
 }
 
-module.exports = { download, sha256OfFile, extract, adHocSign, checkRuns };
+module.exports = { download, sha256OfFile, extract, checkRuns };

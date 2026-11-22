@@ -1,4 +1,4 @@
-// Small helpers shared by the two local engine servers.
+// Small helpers for running a local engine server (used by the clean-up engine).
 
 const net = require("net");
 const { spawn } = require("child_process");
@@ -27,20 +27,9 @@ async function waitUntilReady(child, isReady, { timeoutMs = 60000, name = "serve
   throw new Error(`${name} did not start within ${timeoutMs / 1000}s`);
 }
 
-function canConnect(port) {
-  return new Promise((resolve) => {
-    const socket = net.connect(port, "127.0.0.1");
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once("error", () => resolve(false));
-  });
-}
-
 function startProcess(binary, args) {
   // Output is ignored: it is engine diagnostics, and it never contains what was said.
   return spawn(binary, args, { stdio: "ignore" });
 }
 
-module.exports = { findFreePort, waitUntilReady, canConnect, startProcess };
+module.exports = { findFreePort, waitUntilReady, startProcess };
