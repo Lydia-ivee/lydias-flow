@@ -10,6 +10,7 @@
 
 const { removeFillers, countFillers } = require("../shared/fillers");
 const { toBritish } = require("../shared/ukSpelling");
+const { splitOnSnippets, joinParts, expandPlaceholders } = require("../shared/snippets");
 
 async function processDictation(rawTranscript, { cleanup, britishEnglish }, cleaner) {
   const fillers = countFillers(rawTranscript);
@@ -30,4 +31,42 @@ async function processDictation(rawTranscript, { cleanup, britishEnglish }, clea
   return { text, fillers, usedModel };
 }
 
-module.exports = { processDictation };
+// The full dictate step, snippets included. What you said is split around any
+// snippets: spoken parts go through processDictation, snippets are typed
+// exactly as saved, and everything is joined back together in order.
+async function processSpeech(rawTranscript, settings, cleaner, { clipboard = "", now = new Date() } = {}) {
+  const parts = splitOnSnippets(rawTranscript, settings.snippets || []);
+  if (!parts.some((part) => part.snippet)) {
+    return { ...(await processDictation(rawTranscript, settings, cleaner)), snippets: [] };
+  }
+
+  const finished = [];
+  let usedModel = false;
+  for (const part of parts) {
+    if (part.snippet) {
+      const text = expandPlaceholders(part.snippet.text, { clipboard, now });
+      finished.push({ text, multiline: text.includes("\n") });
+    } else {
+      const result = await processDictation(part.text, settings, cleaner);
+      let text = result.text;
+      // Tidying treats each part as a new sentence and capitalises it. If the
+      // part actually continues a sentence ("...1 Example Street by Friday"),
+      // put back the first letter's case as spoken, so "by" stays lowercase
+      // but "London" stays capitalised.
+      const previous = finished.at(-1)?.text || "";
+      if (previous && !/[.!?\n]$/.test(previous) && /^[a-z]/.test(part.text)) {
+        text = text.charAt(0).toLowerCase() + text.slice(1);
+      }
+      finished.push({ text });
+      usedModel = usedModel || result.usedModel;
+    }
+  }
+  return {
+    text: joinParts(finished),
+    fillers: countFillers(rawTranscript),
+    usedModel,
+    snippets: parts.filter((part) => part.snippet).map((part) => part.snippet.trigger),
+  };
+}
+
+module.exports = { processDictation, processSpeech };
