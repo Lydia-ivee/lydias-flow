@@ -14,7 +14,11 @@
     { "spoken": "Snippet meeting link.", "expected": "meeting link" },
     { "spoken": "Insert today's date.", "expected": "today's date" },
     { "spoken": "Um, insert out of office.", "expected": "out of office" },
+    { "spoken": "Thanks for your help today, insert my sign-off.", "expected": "my sign-off" },
+    { "spoken": "Please post it to insert my work address by Monday.", "expected": "my work address" },
     { "spoken": "Insert a table of the results here.", "expected": null },
-    { "spoken": "Insert the new paragraph after the introduction.", "expected": null }
+    { "spoken": "Insert the new paragraph after the introduction.", "expected": null },
+    { "spoken": "We should insert a quick summary at the top.", "expected": null },
+    { "spoken": "Can you insert the chart into the deck?", "expected": null }
   ]
 }
