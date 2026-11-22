@@ -12,6 +12,18 @@ const { removeFillers, countFillers } = require("../shared/fillers");
 const { toBritish } = require("../shared/ukSpelling");
 const { splitOnSnippets, joinParts, expandPlaceholders } = require("../shared/snippets");
 
+/** @typedef {import("../shared/types").Settings} Settings */
+/** @typedef {import("../shared/types").TextCleaner} TextCleaner */
+/** @typedef {import("../shared/types").DictationResult} DictationResult */
+/** @typedef {import("../shared/types").SpeechResult} SpeechResult */
+/** @typedef {import("../shared/types").JoinPart} JoinPart */
+
+/**
+ * @param {string} rawTranscript
+ * @param {Pick<Settings, "cleanup" | "britishEnglish">} settings
+ * @param {TextCleaner} [cleaner] left out when clean-up is off
+ * @returns {Promise<DictationResult>}
+ */
 async function processDictation(rawTranscript, { cleanup, britishEnglish }, cleaner) {
   const fillers = countFillers(rawTranscript);
   let text = removeFillers(rawTranscript);
@@ -34,12 +46,20 @@ async function processDictation(rawTranscript, { cleanup, britishEnglish }, clea
 // The full dictate step, snippets included. What you said is split around any
 // snippets: spoken parts go through processDictation, snippets are typed
 // exactly as saved, and everything is joined back together in order.
+/**
+ * @param {string} rawTranscript
+ * @param {Settings} settings
+ * @param {TextCleaner} [cleaner]
+ * @param {{ clipboard?: string, now?: Date }} [options]
+ * @returns {Promise<SpeechResult>}
+ */
 async function processSpeech(rawTranscript, settings, cleaner, { clipboard = "", now = new Date() } = {}) {
   const parts = splitOnSnippets(rawTranscript, settings.snippets || []);
   if (!parts.some((part) => part.snippet)) {
     return { ...(await processDictation(rawTranscript, settings, cleaner)), snippets: [] };
   }
 
+  /** @type {JoinPart[]} */
   const finished = [];
   let usedModel = false;
   for (const part of parts) {
@@ -65,7 +85,8 @@ async function processSpeech(rawTranscript, settings, cleaner, { clipboard = "",
     text: joinParts(finished),
     fillers: countFillers(rawTranscript),
     usedModel,
-    snippets: parts.filter((part) => part.snippet).map((part) => part.snippet.trigger),
+    // `!== undefined` (not plain truthiness) lets TypeScript narrow the filtered parts to snippets.
+    snippets: parts.filter((part) => part.snippet !== undefined).map((part) => part.snippet.trigger),
   };
 }
 

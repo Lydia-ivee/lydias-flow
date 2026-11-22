@@ -3,15 +3,21 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
+/** @typedef {import("../shared/types").Settings} Settings */
+
 contextBridge.exposeInMainWorld("flow", {
   // Pill window
+  /** @param {(state: { state: string, detail: string }) => void} callback */
   onState: (callback) => ipcRenderer.on("pill:state", (_e, state) => callback(state)),
+  /** @param {(command: { start: boolean, microphoneId?: string }) => void} callback */
   onRecord: (callback) => ipcRenderer.on("pill:record", (_e, command) => callback(command)),
+  /** @param {ArrayBuffer} samples the recorder's Float32Array buffer */
   sendAudio: (samples) => ipcRenderer.send("pill:audio", samples),
   micError: () => ipcRenderer.send("pill:mic-error"),
 
   // Settings window
   getSettings: () => ipcRenderer.invoke("settings:get"),
+  /** @param {Partial<Settings>} settings */
   saveSettings: (settings) => ipcRenderer.invoke("settings:save", settings),
   openReport: () => ipcRenderer.send("open:report"),
   openAccessibility: () => ipcRenderer.send("open:accessibility"),

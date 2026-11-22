@@ -19,9 +19,67 @@ const { matchSnippet } = require("../src/shared/snippets");
 const { speak } = require("./speech");
 const { words, wordErrorRate, countPhrases, percentile, mean } = require("./metrics");
 
+/** @typedef {import("../src/shared/types").Snippet} Snippet */
+
+/**
+ * One sentence from cases.json.
+ * @typedef {object} EvalCase
+ * @property {string} id
+ * @property {string} spoken what the voice says
+ * @property {string} expected the ideal typed text
+ * @property {string[]} [british] British spellings that should appear
+ * @property {string[]} [mustNotContain] set on trap prompts
+ */
+
+/**
+ * @typedef {object} SnippetEvals
+ * @property {Snippet[]} snippets
+ * @property {{ spoken: string, expected: string | null }[]} commands expected is null for look-alikes
+ */
+
+/** @typedef {ReturnType<typeof scoreOne>} Score */
+/** @typedef {Score & { text: string, latencyMs: number, usedModel?: boolean }} ModeScore */
+
+/**
+ * One clip, scored both ways.
+ * @typedef {object} EvalRow
+ * @property {string} id
+ * @property {string} voice
+ * @property {string} accent
+ * @property {number} rate
+ * @property {string} raw
+ * @property {number} speechWer
+ * @property {ModeScore} rules
+ * @property {ModeScore} ai
+ */
+
+/**
+ * @typedef {object} SnippetRow
+ * @property {string} voice
+ * @property {number} rate
+ * @property {string} spoken
+ * @property {string} raw
+ * @property {string | null} expected
+ * @property {string | null} got
+ */
+
+/**
+ * @typedef {object} EvalResults
+ * @property {string} date
+ * @property {ReturnType<typeof machine>} machine
+ * @property {number} clips
+ * @property {number} speechWer
+ * @property {{ rules: ReturnType<typeof summarise>, ai: ReturnType<typeof summarise> }} summary
+ * @property {{ voice: string, accent: string, speechWer: number, finalWer: number }[]} perVoice
+ * @property {{ commands: number, correct: number, falseFires: number, ordinaryClips: number, misses: SnippetRow[] }} snippets
+ * @property {EvalRow[]} rows
+ */
+
 const ROOT = path.join(__dirname, "..");
 const DIRS = { enginesDir: path.join(ROOT, "engines"), modelsDir: path.join(ROOT, "models") };
+/** @type {EvalCase[]} */
 const CASES = JSON.parse(fs.readFileSync(path.join(__dirname, "cases.json"), "utf8"));
+/** @type {SnippetEvals} */
 const SNIPPETS = JSON.parse(fs.readFileSync(path.join(__dirname, "snippets.json"), "utf8"));
 
 const VOICES = [
@@ -37,9 +95,15 @@ const RATES = [175, 230]; // normal and fast speech, words per minute
 // Fillers that should always go. "like" and "so" are left out: they are often real words.
 const FILLERS = ["um", "uh", "er", "erm", "hmm", "you know", "basically", "i mean"];
 
+/** @param {number} x */
 const percent = (x) => `${(x * 100).toFixed(1)}%`;
+/** @param {number} x */
 const ms = (x) => `${Math.round(x)} ms`;
 
+/**
+ * @param {EvalCase} testCase
+ * @param {string} finalText
+ */
 function scoreOne(testCase, finalText) {
   const finalWords = new Set(words(finalText));
   const british = testCase.british || [];
@@ -60,21 +124,36 @@ function scoreOne(testCase, finalText) {
   };
 }
 
+/**
+ * @param {EvalRow[]} rows
+ * @param {"rules" | "ai"} mode
+ */
 function summarise(rows, mode) {
   const scored = rows.map((r) => r[mode]);
   const traps = scored.filter((s) => s.isTrap);
+  /** @param {"fillersSpoken" | "fillersLeft" | "britishWanted" | "britishFound"} key */
   const sum = (key) => scored.reduce((n, s) => n + s[key], 0);
   return {
     finalWer: mean(scored.map((s) => s.wer)),
     fillerRemoval: 1 - sum("fillersLeft") / Math.max(1, sum("fillersSpoken")),
     britishAccuracy: sum("britishFound") / Math.max(1, sum("britishWanted")),
     trapsResisted: traps.length ? traps.filter((s) => s.trapResisted).length / traps.length : 1,
-    latencyP50: percentile(scored.map((s) => s.latencyMs), 50),
-    latencyP95: percentile(scored.map((s) => s.latencyMs), 95),
+    latencyP50: percentile(
+      scored.map((s) => s.latencyMs),
+      50,
+    ),
+    latencyP95: percentile(
+      scored.map((s) => s.latencyMs),
+      95,
+    ),
   };
 }
 
 function machine() {
+  /**
+   * @param {string} cmd
+   * @param {string[]} args
+   */
   const read = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8" }).trim();
   return {
     chip: read("sysctl", ["-n", "machdep.cpu.brand_string"]),
@@ -83,6 +162,10 @@ function machine() {
   };
 }
 
+/**
+ * @param {EvalResults} results
+ * @returns {string}
+ */
 function scorecard(results) {
   const { rules, ai } = results.summary;
   const lines = [
@@ -108,6 +191,10 @@ function scorecard(results) {
   return lines.join("\n");
 }
 
+/**
+ * @param {string} markdown
+ * @returns {boolean} false if README.md has no eval markers
+ */
 function updateReadme(markdown) {
   const file = path.join(ROOT, "README.md");
   const readme = fs.readFileSync(file, "utf8");
@@ -130,7 +217,9 @@ async function main() {
   const warm = await transcriber.transcribe(speak("Warming up."));
   await cleaner.clean(warm);
 
+  /** @type {EvalRow[]} */
   const rows = [];
+  /** @type {SnippetRow[]} */
   const snippetRows = [];
   try {
     for (const { voice, accent } of VOICES) {
@@ -168,7 +257,14 @@ async function main() {
         for (const command of SNIPPETS.commands) {
           const raw = await transcriber.transcribe(speak(command.spoken, { voice, rate }));
           const matched = matchSnippet(raw, SNIPPETS.snippets);
-          snippetRows.push({ voice, rate, spoken: command.spoken, raw, expected: command.expected, got: matched ? matched.trigger : null });
+          snippetRows.push({
+            voice,
+            rate,
+            spoken: command.spoken,
+            raw,
+            expected: command.expected,
+            got: matched ? matched.trigger : null,
+          });
         }
       }
       console.log(` ${voice}`);
@@ -178,6 +274,7 @@ async function main() {
     cleaner.stop();
   }
 
+  /** @type {EvalResults} */
   const results = {
     date: new Date().toISOString().slice(0, 10),
     machine: machine(),
@@ -186,7 +283,12 @@ async function main() {
     summary: { rules: summarise(rows, "rules"), ai: summarise(rows, "ai") },
     perVoice: VOICES.map(({ voice, accent }) => {
       const mine = rows.filter((r) => r.voice === voice);
-      return { voice, accent, speechWer: mean(mine.map((r) => r.speechWer)), finalWer: mean(mine.map((r) => r.ai.wer)) };
+      return {
+        voice,
+        accent,
+        speechWer: mean(mine.map((r) => r.speechWer)),
+        finalWer: mean(mine.map((r) => r.ai.wer)),
+      };
     }),
     snippets: {
       commands: snippetRows.length,

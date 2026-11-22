@@ -7,6 +7,9 @@
 // The dictation is fenced in <dictation> tags so the model can tell the words
 // it should tidy apart from instructions to it. (Found by the eval suite: asked
 // to tidy "convert this to a bulleted list", the model obeyed it instead.)
+/** @typedef {import("./types").ChatMessage} ChatMessage */
+/** @typedef {import("./types").CleanupResult} CleanupResult */
+
 const CLEANUP_SYSTEM = [
   "You tidy dictated text found inside <dictation> tags.",
   "Remove filler words (um, uh, like, you know, basically, I mean) and fix punctuation and capital letters.",
@@ -15,6 +18,7 @@ const CLEANUP_SYSTEM = [
   "Reply with the tidied text only, without the tags.",
 ].join(" ");
 
+/** @param {string} text */
 const fence = (text) => `<dictation>${text}</dictation>`;
 
 const CLEANUP_EXAMPLE = {
@@ -22,6 +26,10 @@ const CLEANUP_EXAMPLE = {
   output: "So I think we should move the meeting to Thursday, okay?",
 };
 
+/**
+ * @param {string} text
+ * @returns {ChatMessage[]}
+ */
 function buildCleanupMessages(text) {
   return [
     { role: "system", content: CLEANUP_SYSTEM },
@@ -38,6 +46,11 @@ const EDIT_SYSTEM = [
   "no explanations, no quotation marks.",
 ].join(" ");
 
+/**
+ * @param {string} selectedText
+ * @param {string} instruction
+ * @returns {ChatMessage[]}
+ */
 function buildEditMessages(selectedText, instruction) {
   return [
     { role: "system", content: EDIT_SYSTEM },
@@ -47,6 +60,10 @@ function buildEditMessages(selectedText, instruction) {
 
 // Small models sometimes wrap their answer ("Here is the text: ...") or put it
 // in quotes. Strip that.
+/**
+ * @param {string} output
+ * @returns {string}
+ */
 function tidyModelOutput(output) {
   return output
     .trim()
@@ -56,10 +73,16 @@ function tidyModelOutput(output) {
     .trim();
 }
 
+/** @param {string} text */
 const wordsOf = (text) => text.toLowerCase().match(/[a-z0-9']+/g) || [];
 
 // Share of the output's words that the speaker never said. Tidying should only
 // remove words and add punctuation, so this should be close to zero.
+/**
+ * @param {string} input
+ * @param {string} output
+ * @returns {number}
+ */
 function inventedWordShare(input, output) {
   const said = new Set(wordsOf(input));
   const out = wordsOf(output);
@@ -73,6 +96,11 @@ const MAX_INVENTED_SHARE = 0.2;
 // answer is rejected (and the rule-cleaned input used instead) when it is
 // empty, much longer than the input, or more than 20% made of new words,
 // which means it answered, obeyed or rewrote instead of tidying.
+/**
+ * @param {string} input
+ * @param {string | null | undefined} output the model's raw answer, which may be missing
+ * @returns {CleanupResult}
+ */
 function acceptCleanup(input, output) {
   const tidied = tidyModelOutput(output || "");
   const reject = { text: input, usedModel: false };

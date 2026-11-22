@@ -4,21 +4,43 @@
 // spoke, how many words, which filler words. Never the words themselves, so
 // the report cannot leak what you said.
 
+/** @typedef {import("./types").StatsInput} StatsInput */
+/** @typedef {import("./types").StatsEntry} StatsEntry */
+/** @typedef {import("./types").Report} Report */
+/** @typedef {import("./types").FillerCounts} FillerCounts */
+
 const TYPING_WPM = 40; // a typical typing speed, used for "time saved"
 
+/**
+ * @param {StatsInput} input
+ * @returns {StatsEntry}
+ */
 function makeEntry({ at = new Date(), audioMs, words, fillers, mode }) {
   return { at: at.toISOString(), audioMs: Math.round(audioMs), words, fillers, mode };
 }
 
+/**
+ * @param {string} text
+ * @returns {number}
+ */
 function wordCount(text) {
   return (text.match(/[\p{L}\p{N}'’]+/gu) || []).length;
 }
 
+/**
+ * @param {Date} date
+ * @returns {string}
+ */
 function dayKey(date) {
   return date.toISOString().slice(0, 10);
 }
 
 // Turns stored entries into the numbers the report shows.
+/**
+ * @param {StatsEntry[]} entries
+ * @param {{ now?: Date, days?: number }} [options]
+ * @returns {Report}
+ */
 function summarise(entries, { now = new Date(), days = 7 } = {}) {
   const since = new Date(now);
   since.setUTCDate(since.getUTCDate() - (days - 1));
@@ -29,6 +51,7 @@ function summarise(entries, { now = new Date(), days = 7 } = {}) {
   const speakingMinutes = recent.reduce((sum, e) => sum + e.audioMs, 0) / 60000;
   const typingMinutes = words / TYPING_WPM;
 
+  /** @type {FillerCounts} */
   const fillerTotals = {};
   for (const entry of recent) {
     for (const [filler, count] of Object.entries(entry.fillers || {})) {
@@ -62,6 +85,10 @@ function summarise(entries, { now = new Date(), days = 7 } = {}) {
 
 // The file is JSON Lines: one entry per line, so adding one is a cheap append
 // and a damaged line only loses that one entry.
+/**
+ * @param {string} text
+ * @returns {StatsEntry[]}
+ */
 function parseLines(text) {
   return text
     .split("\n")
