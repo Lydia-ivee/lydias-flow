@@ -16,6 +16,7 @@ const { Transcriber } = require("../src/main/transcriber");
 const { Cleaner } = require("../src/main/cleaner");
 const { processDictation } = require("../src/main/pipeline");
 const { matchSnippet } = require("../src/shared/snippets");
+const { LivePreview, FAST_START_MS, WINDOW_SECONDS } = require("../src/main/livePreview");
 const { speak } = require("./speech");
 const { words, wordErrorRate, countPhrases, percentile, mean } = require("./metrics");
 
@@ -72,8 +73,93 @@ const { words, wordErrorRate, countPhrases, percentile, mean } = require("./metr
  * @property {{ rules: ReturnType<typeof summarise>, ai: ReturnType<typeof summarise> }} summary
  * @property {{ voice: string, accent: string, speechWer: number, finalWer: number }[]} perVoice
  * @property {{ commands: number, correct: number, falseFires: number, ordinaryClips: number, misses: SnippetRow[] }} snippets
+ * @property {LiveSummary} live
  * @property {EvalRow[]} rows
  */
+
+/**
+ * @typedef {object} LiveSummary
+ * @property {number} clips
+ * @property {number} firstWordP50 ms from the start of speech to the first words on screen
+ * @property {number} firstWordP95
+ * @property {number} previewWer word error rate of the last preview against what was said (clips within the window)
+ * @property {number} previewClips clips short enough to judge preview accuracy
+ * @property {number} busyShare share of speaking time the preview spends reading
+ * @property {number} skipped beats skipped because the previous read was still running
+ */
+
+// Live text, measured through the real LivePreview class. Audio is fed in
+// 0.128s blocks like the recorder sends, with the app's timer beat
+// (FAST_START_MS); LivePreview itself decides whether a read is due. Each read
+// runs on the real model, and a read still running in audio time when the next
+// one is due counts as a skipped beat, as it would in the app.
+/**
+ * @param {Transcriber} transcriber
+ * @returns {Promise<LiveSummary>}
+ */
+async function measureLive(transcriber) {
+  const BLOCK = 2048;
+  const BEAT = (FAST_START_MS / 1000) * 16000;
+  /** @type {number[]} */
+  const firstWord = [];
+  /** @type {number[]} */
+  const wers = [];
+  /** @type {number[]} */
+  const busy = [];
+  let skipped = 0;
+  for (const voice of LIVE_VOICES) {
+    for (const testCase of CASES) {
+      const samples = speak(testCase.spoken, { voice, rate: RATES[0] });
+      const speechStart = samples.findIndex((x) => Math.abs(x) > 0.02) / 16000;
+      /** @type {number | null} */
+      let first = null;
+      let lastText = "";
+      let readMs = 0;
+      let audioClock = 0; // seconds of audio fed so far
+      let readFinishesAt = 0; // when, in audio time, the current read is done
+      const preview = new LivePreview({
+        transcribe: async (window) => {
+          const started = performance.now();
+          const text = await transcriber.transcribe(window);
+          const took = performance.now() - started;
+          readMs += took;
+          readFinishesAt = audioClock + took / 1000;
+          if (first === null && text) first = readFinishesAt - speechStart;
+          return text;
+        },
+        onText: (text) => (lastText = text),
+        setTimer: /** @type {any} */ (() => 0),
+        clearTimer: () => {},
+      });
+      preview.start();
+      for (let fed = 0; fed < samples.length; fed += BLOCK) {
+        preview.push(samples.subarray(fed, fed + BLOCK));
+        audioClock = (fed + BLOCK) / 16000;
+        if (Math.floor((fed + BLOCK) / BEAT) > Math.floor(fed / BEAT)) {
+          const due = preview.lastText === "" || preview.totalSamples - preview.lastReadAt >= preview.intervalSamples;
+          // A due read while the last one is still "running" in audio time is a skipped beat.
+          if (audioClock < readFinishesAt) skipped += due ? 1 : 0;
+          else if (preview.tick()) await preview.inFlight;
+        }
+      }
+      await preview.stop();
+      firstWord.push((first ?? 99) * 1000);
+      // The preview only reads the last WINDOW_SECONDS, so judge its accuracy
+      // only on clips that fit inside that window.
+      if (samples.length / 16000 <= WINDOW_SECONDS) wers.push(wordErrorRate(testCase.spoken, lastText));
+      busy.push(readMs / 1000 / (samples.length / 16000));
+    }
+  }
+  return {
+    clips: firstWord.length,
+    firstWordP50: percentile(firstWord, 50),
+    firstWordP95: percentile(firstWord, 95),
+    previewWer: mean(wers),
+    previewClips: wers.length,
+    busyShare: mean(busy),
+    skipped,
+  };
+}
 
 const ROOT = path.join(__dirname, "..");
 const DIRS = { enginesDir: path.join(ROOT, "engines"), modelsDir: path.join(ROOT, "models") };
@@ -90,6 +176,8 @@ const VOICES = [
   { voice: "Moira", accent: "Irish" },
   { voice: "Aman", accent: "Indian" },
 ];
+// Live text is measured on a British and an American voice, normal speed.
+const LIVE_VOICES = ["Daniel", "Eddy (English (US))"];
 const RATES = [175, 230]; // normal and fast speech, words per minute
 
 // Fillers that should always go. "like" and "so" are left out: they are often real words.
@@ -187,6 +275,8 @@ function scorecard(results) {
     ...results.perVoice.map((v) => `| ${v.voice} | ${v.accent} | ${percent(v.speechWer)} | ${percent(v.finalWer)} |`),
     "",
     `**Voice snippets:** the right result (the snippet, or nothing for look-alike sentences) in ${percent(results.snippets.correct)} of ${results.snippets.commands} spoken commands; set off by ordinary dictation in ${results.snippets.falseFires} of ${results.snippets.ordinaryClips} clips.`,
+    "",
+    `**Live text:** first words on screen ${ms(results.live.firstWordP50)} after you start speaking (median; slowest 5%: ${ms(results.live.firstWordP95)}), across ${results.live.clips} clips. The preview's word error rate is ${percent(results.live.previewWer)} on the ${results.live.previewClips} clips that fit its 8-second window, and reading costs ${percent(results.live.busyShare)} of speaking time (${results.live.skipped} ${results.live.skipped === 1 ? "beat" : "beats"} skipped while a read was still running).`,
   ];
   return lines.join("\n");
 }
@@ -221,6 +311,8 @@ async function main() {
   const rows = [];
   /** @type {SnippetRow[]} */
   const snippetRows = [];
+  /** @type {LiveSummary | undefined} */
+  let live;
   try {
     for (const { voice, accent } of VOICES) {
       for (const rate of RATES) {
@@ -269,6 +361,9 @@ async function main() {
       }
       console.log(` ${voice}`);
     }
+    process.stdout.write("Live text ");
+    live = await measureLive(transcriber);
+    console.log("done");
   } finally {
     transcriber.stop();
     cleaner.stop();
@@ -298,6 +393,7 @@ async function main() {
       ordinaryClips: rows.length,
       misses: snippetRows.filter((r) => r.got !== r.expected),
     },
+    live: /** @type {LiveSummary} */ (live),
     rows,
   };
 
