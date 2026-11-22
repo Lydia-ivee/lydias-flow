@@ -8,11 +8,17 @@
 // 2. countFillers: counts a wider set, including "you know" and "basically",
 //    for the Flow Report. It returns numbers only, never the text.
 
+/** @typedef {import("./types").FillerCounts} FillerCounts */
+
 const NOISE = ["um", "umm", "uh", "uhh", "er", "erm", "hmm", "mm"];
 
 // A noise word, any commas or full stop straight after it, and the space before it.
 const NOISE_PATTERN = new RegExp(`(^|\\s)(?:${NOISE.join("|")})\\b[,.]?`, "gi");
 
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 function removeFillers(text) {
   const cleaned = text
     .replace(NOISE_PATTERN, "$1")
@@ -33,8 +39,13 @@ const TRACKED = [
   "um", "uh", "er", "erm", "hmm", "like", "basically", "literally", "actually", "so yeah",
 ];
 
+/**
+ * @param {string} text
+ * @returns {FillerCounts}
+ */
 function countFillers(text) {
   let remaining = ` ${text.toLowerCase().replace(/[^a-z' ]+/g, " ")} `;
+  /** @type {FillerCounts} */
   const counts = {};
   for (const filler of TRACKED) {
     const pattern = new RegExp(` ${filler} `, "g");

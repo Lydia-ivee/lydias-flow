@@ -11,6 +11,10 @@
 
 const { execFile } = require("child_process");
 
+/**
+ * @param {string} letter
+ * @returns {Promise<void>}
+ */
 function pressKeys(letter) {
   const script = `tell application "System Events" to keystroke "${letter}" using command down`;
   return new Promise((resolve, reject) => {
@@ -18,12 +22,28 @@ function pressKeys(letter) {
   });
 }
 
+/**
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * The bits of Electron's clipboard this uses, so tests can pass a stand-in.
+ * @typedef {{ readText(): string, writeText(text: string): void }} TextClipboard
+ */
+
+/**
+ * @param {{ clipboard: TextClipboard, press?: (letter: string) => Promise<void>, sleep?: (ms: number) => Promise<void> }} options
+ */
 function createPaster({ clipboard, press = pressKeys, sleep = wait }) {
   // Give the target app time to read the clipboard before we restore it.
   const READ_DELAY_MS = 250;
 
+  /**
+   * @param {string} text
+   * @returns {Promise<void>}
+   */
   async function pasteText(text) {
     const saved = clipboard.readText();
     clipboard.writeText(text);
@@ -36,6 +56,7 @@ function createPaster({ clipboard, press = pressKeys, sleep = wait }) {
   }
 
   // Copies the current selection and returns it ("" if nothing is selected).
+  /** @returns {Promise<string>} */
   async function copySelection() {
     const saved = clipboard.readText();
     const marker = `__flow_${Date.now()}__`; // tells "nothing copied" apart from old text

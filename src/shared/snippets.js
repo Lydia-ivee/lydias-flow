@@ -11,12 +11,35 @@
 // of" for "my sign-off"). If the words after "insert" match no trigger
 // ("insert a table here"), nothing happens and your words are typed as said.
 
+/** @typedef {import("./types").Snippet} Snippet */
+/** @typedef {import("./types").SnippetPart} SnippetPart */
+/** @typedef {import("./types").JoinPart} JoinPart */
+
+/**
+ * A word of the transcript and where it sits in the original text.
+ * @typedef {{ start: number, end: number, normalised: string }} Token
+ */
+
+/**
+ * A snippet's trigger, normalised, with its word count.
+ * @typedef {{ snippet: Snippet, normalised: string, words: number }} Trigger
+ */
+
+/**
+ * The closest trigger found after a command word.
+ * @typedef {{ snippet: Snippet, lastToken: number, score: number }} TriggerMatch
+ */
+
 const COMMAND_WORDS = ["insert", "snippet"];
 const NOISE = new Set(["um", "umm", "uh", "uhh", "er", "erm", "hmm"]);
 const MIN_SIMILARITY = 0.75;
 
 // Lowercase words only, no punctuation, hyphens or noise: "Insert my sign-off."
 // and "um insert my sign off" both become "insert my sign off".
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 function normalise(text) {
   return text
     .toLowerCase()
@@ -28,6 +51,11 @@ function normalise(text) {
 }
 
 // Letter-level edit distance (the fewest letter changes between two strings).
+/**
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
 function editDistance(a, b) {
   let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i += 1) {
@@ -41,6 +69,11 @@ function editDistance(a, b) {
 }
 
 // 1 means identical, 0 means nothing in common.
+/**
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
 function similarity(a, b) {
   const longest = Math.max(a.length, b.length);
   return longest === 0 ? 1 : 1 - editDistance(a, b) / longest;
@@ -48,6 +81,10 @@ function similarity(a, b) {
 
 // Each word of the transcript with where it sits, so a snippet can be cut out
 // of the original text exactly. "sign-off" and "today's" count as one word.
+/**
+ * @param {string} transcript
+ * @returns {Token[]}
+ */
 function tokenise(transcript) {
   return [...transcript.matchAll(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g)].map((m) => ({
     start: m.index,
@@ -58,9 +95,17 @@ function tokenise(transcript) {
 
 // After the command word at `at`, try the next 1, 2, 3... words against every
 // trigger and keep the closest match. Returns { snippet, lastToken } or null.
+/**
+ * @param {Token[]} tokens
+ * @param {number} at
+ * @param {Trigger[]} triggers
+ * @returns {TriggerMatch | null}
+ */
 function bestTriggerAfter(tokens, at, triggers) {
   const longest = Math.max(...triggers.map((t) => t.words));
+  /** @type {TriggerMatch | null} */
   let best = null;
+  /** @type {string[]} */
   let spoken = [];
   for (let j = at + 1; j < tokens.length && spoken.length < longest + 1; j += 1) {
     if (!tokens[j].normalised) continue; // skip "um"
@@ -77,6 +122,11 @@ function bestTriggerAfter(tokens, at, triggers) {
 
 // Splits what you said into spoken parts and snippets, in order:
 //   [{ text: "Thanks for your time today" }, { snippet: {...} }]
+/**
+ * @param {string} transcript
+ * @param {Snippet[]} snippets
+ * @returns {SnippetPart[]}
+ */
 function splitOnSnippets(transcript, snippets) {
   const triggers = snippets
     .map((snippet) => ({ snippet, normalised: normalise(snippet.trigger) }))
@@ -85,6 +135,7 @@ function splitOnSnippets(transcript, snippets) {
   if (triggers.length === 0) return [{ text: transcript }];
 
   const tokens = tokenise(transcript);
+  /** @type {SnippetPart[]} */
   const parts = [];
   let cursor = 0; // where the next spoken part starts in the original text
   for (let i = 0; i < tokens.length; i += 1) {
@@ -98,7 +149,10 @@ function splitOnSnippets(transcript, snippets) {
     parts.push({ snippet: found.snippet });
 
     // Resume after the trigger and any punctuation straight after it.
-    const afterTrigger = transcript.slice(tokens[found.lastToken].end).match(/^[\s.,;:!?]*/)[0];
+    // The pattern can match nothing, so match() never returns null here.
+    const afterTrigger = /** @type {RegExpMatchArray} */ (
+      transcript.slice(tokens[found.lastToken].end).match(/^[\s.,;:!?]*/)
+    )[0];
     cursor = tokens[found.lastToken].end + afterTrigger.length;
     i = found.lastToken;
   }
@@ -108,13 +162,23 @@ function splitOnSnippets(transcript, snippets) {
 }
 
 // The first snippet in what you said, or null if it was ordinary dictation.
+/**
+ * @param {string} transcript
+ * @param {Snippet[]} snippets
+ * @returns {Snippet | null}
+ */
 function matchSnippet(transcript, snippets) {
-  const part = splitOnSnippets(transcript, snippets).find((p) => p.snippet);
+  // `!== undefined` (not plain truthiness) lets TypeScript narrow the found part to a snippet.
+  const part = splitOnSnippets(transcript, snippets).find((p) => p.snippet !== undefined);
   return part ? part.snippet : null;
 }
 
 // Puts finished parts back together. A snippet with line breaks (a sign-off,
 // an address) goes on its own line; a one-line snippet sits in the sentence.
+/**
+ * @param {JoinPart[]} parts
+ * @returns {string}
+ */
 function joinParts(parts) {
   let out = "";
   let previousMultiline = false;
@@ -128,9 +192,16 @@ function joinParts(parts) {
 }
 
 // Fills in {date}, {time} and {clipboard}. Anything else in braces is left alone.
+/**
+ * @param {string} text
+ * @param {{ now?: Date, clipboard?: string }} [options]
+ * @returns {string}
+ */
 function expandPlaceholders(text, { now = new Date(), clipboard = "" } = {}) {
   // Built from parts, because the system format adds a comma ("Monday, 23 November").
+  /** @param {Intl.DateTimeFormatOptions} options */
   const part = (options) => now.toLocaleDateString("en-GB", options);
+  /** @type {Record<string, string>} */
   const values = {
     date: `${part({ weekday: "long" })} ${part({ day: "numeric" })} ${part({ month: "long" })} ${part({ year: "numeric" })}`,
     time: now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }),
@@ -140,6 +211,10 @@ function expandPlaceholders(text, { now = new Date(), clipboard = "" } = {}) {
 }
 
 // Keeps only well-formed snippets, so a damaged settings file can't break dictation.
+/**
+ * @param {unknown} list whatever was in the settings file
+ * @returns {Snippet[]}
+ */
 function cleanSnippets(list) {
   if (!Array.isArray(list)) return [];
   return list

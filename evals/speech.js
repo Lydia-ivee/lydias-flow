@@ -14,8 +14,19 @@ const { execFileSync } = require("child_process");
 
 const CACHE_DIR = path.join(__dirname, ".audio-cache");
 
+/**
+ * @typedef {object} SpeechOptions
+ * @property {string} [voice]
+ * @property {number} [rate]
+ */
+
 // Returns 16 kHz mono float32 samples, the format the app's recorder produces.
 // voice: a macOS voice name (see `say -v '?'`); rate: words per minute.
+/**
+ * @param {string} sentence
+ * @param {SpeechOptions} [options]
+ * @returns {Float32Array}
+ */
 function speak(sentence, { voice, rate } = {}) {
   const cacheFile = path.join(
     CACHE_DIR,
@@ -31,6 +42,11 @@ function speak(sentence, { voice, rate } = {}) {
   return samples;
 }
 
+/**
+ * @param {string} sentence
+ * @param {SpeechOptions} options
+ * @returns {Float32Array}
+ */
 function synthesise(sentence, { voice, rate }) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "flow-say-"));
   const file = path.join(dir, "clip.wav");

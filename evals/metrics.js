@@ -2,6 +2,10 @@
 
 // Words for comparison: lowercase, curly apostrophes made straight, punctuation
 // dropped. "Friday." and "friday" count as the same word.
+/**
+ * @param {string} text
+ * @returns {string[]}
+ */
 function words(text) {
   return text
     .toLowerCase()
@@ -15,6 +19,11 @@ function words(text) {
 // Word error rate: the fewest substitutions, insertions and deletions needed to
 // turn `hypothesis` into `reference`, divided by the reference length. This is
 // the standard accuracy measure for speech recognition. 0 is perfect.
+/**
+ * @param {string} reference
+ * @param {string} hypothesis
+ * @returns {number}
+ */
 function wordErrorRate(reference, hypothesis) {
   const ref = words(reference);
   const hyp = words(hypothesis);
@@ -34,6 +43,11 @@ function wordErrorRate(reference, hypothesis) {
 }
 
 // How often each filler appears, matching whole words and phrases only.
+/**
+ * @param {string} text
+ * @param {string[]} phrases
+ * @returns {number}
+ */
 function countPhrases(text, phrases) {
   const padded = ` ${words(text).join(" ")} `;
   return phrases.reduce((total, phrase) => {
@@ -42,6 +56,11 @@ function countPhrases(text, phrases) {
   }, 0);
 }
 
+/**
+ * @param {number[]} values
+ * @param {number} p 0 to 100
+ * @returns {number}
+ */
 function percentile(values, p) {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -49,6 +68,7 @@ function percentile(values, p) {
   return sorted[Math.max(0, index)];
 }
 
+/** @param {number[]} values */
 const mean = (values) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
 
 module.exports = { words, wordErrorRate, countPhrases, percentile, mean };
