@@ -1,0 +1,8 @@
+node_modules/
+engines/
+models/
+bin/
+dist/
+evals/.audio-cache/
+evals/results.json
+package-lock.json
