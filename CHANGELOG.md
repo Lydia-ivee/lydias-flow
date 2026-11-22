@@ -13,6 +13,13 @@ All notable changes, newest first. The format follows
 - `SECURITY.md`, this changelog, a pull request template and Dependabot
   updates for npm packages and GitHub Actions.
 
+### Fixed
+
+- A crash when the last window closed (`window-all-closed` passes no event),
+  found by type checking.
+- Clearer errors for an empty download response and for using the
+  transcriber before it has started.
+
 ## [0.1.0] - 2026-11-22
 
 ### Added
