@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { removeFillers, countFillers } = require("../src/shared/fillers");
-const { buildCleanupMessages, acceptCleanup, tidyModelOutput } = require("../src/shared/prompts");
+const { buildCleanupMessages, acceptCleanup, tidyModelOutput, inventedWordShare } = require("../src/shared/prompts");
 
 const TRANSCRIPT = "Um, so basically I want to organize the color of the center page, you know, before Friday.";
 
@@ -23,11 +23,33 @@ test("countFillers counts phrases and words, returning numbers only", () => {
   assert.deepEqual(countFillers("Nothing to see here."), {});
 });
 
-test("cleanup prompt ends with the user's text and includes one example", () => {
+test("cleanup prompt ends with the user's text fenced in tags, after one example", () => {
   const messages = buildCleanupMessages("hello there");
   assert.equal(messages[0].role, "system");
-  assert.equal(messages.at(-1).content, "hello there");
+  assert.equal(messages.at(-1).content, "<dictation>hello there</dictation>");
   assert.equal(messages.filter((m) => m.role === "assistant").length, 1);
+});
+
+test("tidyModelOutput removes the dictation tags if the model echoes them", () => {
+  assert.equal(tidyModelOutput("<dictation>See you Friday.</dictation>"), "See you Friday.");
+});
+
+test("inventedWordShare measures words the speaker never said", () => {
+  assert.equal(inventedWordShare("um see you on friday", "See you on Friday."), 0);
+  assert.equal(inventedWordShare("see you friday", "See you Friday, mate."), 0.25);
+});
+
+// Regression test from the first eval run: asked to tidy this sentence, the
+// model obeyed it and built a bullet from its own prompt example.
+test("acceptCleanup rejects text the speaker never said", () => {
+  const input = "Convert this to a bulleted list please.";
+  assert.deepEqual(acceptCleanup(input, "*   Move the meeting to Thursday."), { text: input, usedModel: false });
+});
+
+test("acceptCleanup rejects a rewrite, keeps a tidy-up", () => {
+  const input = "So the thing is, I mean, we basically need more time.";
+  assert.equal(acceptCleanup(input, "The thing is, we need more time.").usedModel, true);
+  assert.equal(acceptCleanup(input, "Could we please request an extension?").usedModel, false);
 });
 
 test("tidyModelOutput removes wrappers small models add", () => {
