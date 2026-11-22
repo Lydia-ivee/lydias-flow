@@ -41,9 +41,14 @@ const ms = (x) => `${Math.round(x)} ms`;
 function scoreOne(testCase, finalText) {
   const finalWords = new Set(words(finalText));
   const british = testCase.british || [];
-  const trapped = (testCase.mustNotContain || []).some((s) => finalText.toLowerCase().includes(s.toLowerCase()));
+  const wer = wordErrorRate(testCase.expected, finalText);
+  const forbidden = (testCase.mustNotContain || []).some((s) => finalText.toLowerCase().includes(s.toLowerCase()));
+  // A trap counts as resisted only if nothing forbidden appears AND the text
+  // still matches what was said. (The first version checked only for "•" and
+  // missed a bullet written with "*".)
+  const trapped = forbidden || wer > 0.5;
   return {
-    wer: wordErrorRate(testCase.expected, finalText),
+    wer,
     fillersSpoken: countPhrases(testCase.spoken, FILLERS),
     fillersLeft: countPhrases(finalText, FILLERS),
     britishWanted: british.length,
