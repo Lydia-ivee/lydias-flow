@@ -131,3 +131,20 @@ test("start() after stop() begins a clean session", async () => {
   await flush();
   assert.deepEqual(shown, ["First", "First"]);
 });
+
+test("fast start: reads every beat until words appear, then only every 0.4s of new audio", async () => {
+  const { preview, model } = makePreview();
+  preview.push(seconds(0.2));
+  assert.equal(preview.tick(), true); // no words yet: read on every beat
+  model.calls[0].answer(""); // silence so far
+  await flush();
+  preview.push(seconds(0.2));
+  assert.equal(preview.tick(), true); // still no words: read again
+  model.calls[1].answer("Hello");
+  await flush();
+  preview.push(seconds(0.2));
+  assert.equal(preview.tick(), false); // words showing: 0.2s of new audio is not enough
+  preview.push(seconds(0.2));
+  assert.equal(preview.tick(), true); // 0.4s of new audio: due
+  assert.equal(preview.stats.skipped, 0); // waiting for audio is not a skipped beat
+});

@@ -1,15 +1,16 @@
 // Live text: shows your words in the pill while you are still speaking.
 //
-// There is no separate streaming model. Every 0.4s, the same Parakeet model
-// that produces the final text re-reads the last 8 seconds of audio. On an M2
-// that puts the first words on screen ~0.45s after you start talking, with the
-// same accuracy as the final text (measured: a 54 MB streaming model took
-// ~1.5s and got about 1 word in 5 wrong).
+// There is no separate streaming model. While you speak, the same Parakeet
+// model that produces the final text re-reads the last 8 seconds of audio:
+// every 0.2s until the first words appear (a fast start), then every 0.4s.
+// That gives first words quickly without paying for 0.2s reads all the way
+// through. (Measured: a 54 MB streaming model took ~1.5s to show anything and
+// got about 1 word in 5 wrong.)
 //
 // Three rules keep it cheap and safe:
 //   1. Only the last WINDOW_SECONDS are re-read, so the cost per read stays
 //      flat however long you talk.
-//   2. If the previous read is still running, the next beat is skipped, never
+//   2. If the previous read is still running, the beat is skipped, never
 //      queued, so reads cannot pile up.
 //   3. stop() waits for any read in flight, so the final transcription never
 //      competes with a preview, and a late preview is never shown.
@@ -18,7 +19,8 @@
 // a full read of the whole recording after you let go.
 
 const SAMPLE_RATE = 16000;
-const INTERVAL_MS = 400;
+const FAST_START_MS = 200; // the timer's beat; reads this often until words appear
+const INTERVAL_MS = 400; // then at most this often
 const WINDOW_SECONDS = 8;
 
 class LivePreview {
@@ -41,7 +43,7 @@ class LivePreview {
   }) {
     this.transcribe = transcribe;
     this.onText = onText;
-    this.intervalMs = intervalMs;
+    this.intervalSamples = (intervalMs / 1000) * SAMPLE_RATE;
     this.windowSamples = windowSeconds * SAMPLE_RATE;
     this.setTimer = setTimer;
     this.clearTimer = clearTimer;
@@ -66,7 +68,7 @@ class LivePreview {
     this.lastReadAt = 0;
     this.stats = { reads: 0, skipped: 0 };
     this.active = true;
-    this.timer = this.setTimer(() => this.tick(), this.intervalMs);
+    this.timer = this.setTimer(() => this.tick(), FAST_START_MS);
   }
 
   /** @param {Float32Array} chunk the next block of 16 kHz mono audio */
@@ -107,6 +109,9 @@ class LivePreview {
   /** @returns {boolean} true if a read was started */
   tick() {
     if (!this.active || this.totalSamples === this.lastReadAt) return false;
+    // Fast start: every beat until words appear, then only every INTERVAL_MS of new audio.
+    const showingWords = this.lastText !== "";
+    if (showingWords && this.totalSamples - this.lastReadAt < this.intervalSamples) return false;
     if (this.inFlight) {
       this.stats.skipped += 1; // rule 2: skip, never queue
       return false;
@@ -143,4 +148,4 @@ class LivePreview {
   }
 }
 
-module.exports = { LivePreview, INTERVAL_MS, WINDOW_SECONDS };
+module.exports = { LivePreview, FAST_START_MS, INTERVAL_MS, WINDOW_SECONDS };
