@@ -39,7 +39,10 @@ class Cleaner {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         messages,
-        temperature: 0.2, // low: we want faithful tidying, not creativity
+        // 0 = always pick the most likely next word, so the same dictation is
+        // tidied the same way every time. (At 0.2, the eval found 18 of 240
+        // identical clips tidied differently between runs.)
+        temperature: 0,
         max_tokens: maxTokens,
         // Qwen 3.5 can "think" before answering; that only adds delay here.
         chat_template_kwargs: { enable_thinking: false },
