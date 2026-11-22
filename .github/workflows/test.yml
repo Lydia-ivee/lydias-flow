@@ -3,7 +3,7 @@
 # The end-to-end engine test is skipped here because it needs ~1.9 GB of
 # models; everything else runs, including compiling the Swift key listener.
 
-name: Tests
+name: Checks
 
 on:
   push:
@@ -30,6 +30,15 @@ jobs:
         run: npm ci
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: "1" # the tests never start Electron
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Type check
+        run: npm run typecheck
 
       - name: Compile the Swift key listener
         run: node scripts/build-native.js
