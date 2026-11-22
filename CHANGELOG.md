@@ -8,6 +8,11 @@ All notable changes, newest first. The format follows
 
 ### Added
 
+- Live text: your words appear in the pill as you speak (first words in about
+  0.3 s), with a Live preview switch in Settings. The typed text still comes
+  from a full read after you let go.
+- Live text measurements in the eval suite: time to first word, preview
+  accuracy and processing cost.
 - ESLint, Prettier and type checking of the JavaScript (TypeScript compiler in
   `checkJs` strict mode), all enforced in CI.
 - `SECURITY.md`, this changelog, a pull request template and Dependabot

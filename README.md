@@ -13,6 +13,7 @@ change it. No account, no cloud, no audio leaving your machine.
 - **Dictate anywhere.** Hold `fn` (or a key you choose), speak, release. Text appears at your cursor in any app: email, Slack, a browser, a code editor.
 - **Edit by voice.** Select text, hold the edit key, say "make this more formal" or "shorten this". The selection is rewritten in place.
 - **Tidy, not rewrite.** Filler words go ("um", "you know", "basically"), punctuation is fixed, and nothing you did not say is added. A guard rejects any answer from the AI that contains words you never spoke.
+- **Live text.** Your words appear in the pill as you speak, about 0.3 seconds after you start. The text that gets typed still comes from a full read of the recording when you let go, so seeing your words early costs no accuracy.
 - **Voice snippets, even mid-sentence.** Save text once in Settings with a trigger phrase, then say _"insert my sign-off"_, on its own or mid-flow: _"Thanks for your time today, insert my sign-off"_ types your sentence, tidied, with the sign-off on its own line beneath. Snippets can include `{date}`, `{time}` and `{clipboard}`. Matching is plain code, not AI: "insert" (or "snippet") only counts when the words straight after it closely match a trigger, so _"we should insert a table here"_ is typed as said, while a slight mishearing (_"my sign of"_) still works.
 - **British English mode.** Speech models write American spellings; this turns _organize the color of the center_ into _organise the colour of the centre_.
 - **Flow Report.** Words dictated this week, your speaking speed against typing, minutes saved, and your favourite filler words. Counts only: your words are never stored.
@@ -61,6 +62,7 @@ flowchart LR
 | Key listener   | [`native/key-listener.swift`](native/key-listener.swift)                                       | Electron can only see key presses, not releases, so a 70-line Swift program watches modifier keys and prints `DOWN fn` / `UP fn`.                                                                                                     |
 | Recorder       | [`src/renderer/recorder.js`](src/renderer/recorder.js)                                         | Records at 16 kHz mono, the format the speech model wants, so there is no conversion step. The mic is open only while the key is held.                                                                                                |
 | Speech-to-text | [`src/main/transcriber.js`](src/main/transcriber.js)                                           | NVIDIA Parakeet (0.6B) through sherpa-onnx, running inside the app.                                                                                                                                                                   |
+| Live text      | [`src/main/livePreview.js`](src/main/livePreview.js)                                           | Re-reads the last 8 seconds with the same model: every 0.2s until words appear, then every 0.4s of new audio. Skips a beat rather than queueing if a read is still running, and stops before the final read.                          |
 | Clean-up       | [`src/main/cleaner.js`](src/main/cleaner.js), [`src/shared/prompts.js`](src/shared/prompts.js) | Qwen 3.5 2B on the Mac's GPU via llama.cpp, plus the safety net that decides whether to trust its answer.                                                                                                                             |
 | Pipeline       | [`src/main/pipeline.js`](src/main/pipeline.js)                                                 | The order of operations: noise words, AI tidy-up, then British spelling last so the model cannot undo it.                                                                                                                             |
 | Snippets       | [`src/shared/snippets.js`](src/shared/snippets.js)                                             | Finds each "insert", tries the next 1 to N words against every trigger (letter-level edit distance, 75% similarity), and splits the sentence around any match. Spoken parts are tidied as usual; snippets are typed exactly as saved. |
@@ -70,6 +72,7 @@ flowchart LR
 ## Design decisions and trade-offs
 
 - **Speech runs inside the app, not as a server.** The first version ran sherpa-onnx's WebSocket server, until a check of open ports showed it listening on every network interface with no option to restrict it: anyone on the same Wi-Fi could have sent it audio. Running the model in-process removed the port entirely, at no cost in speed.
+- **Live text re-reads instead of streaming.** The obvious design is a second, streaming speech model. Measured on this Mac, the best small one (54 MB) took 1.5 s to show any words and got about 1 word in 5 wrong. Re-reading the last 8 seconds with the main model every fraction of a second shows words in about 0.3 s with near-final accuracy and no extra download. The cost is processing (about a quarter of one CPU core while you talk), kept flat by the 8-second window and by skipping, never queueing, a beat while a read is still running.
 - **Rules where rules are enough, AI where it helps.** "Um" and "uh" never carry meaning, so rules remove them, instantly and testably. Grammar and false starts need judgement, so they go to the model. British spelling is rules again: a word list and two patterns, with ambiguous words (_program_, _license_, _check_) deliberately left alone because a wrong change is worse than a missed one.
 - **Never type words you did not say.** Tidying should only remove words and add punctuation. If more than 20% of the model's answer is new words, the answer is thrown away and the rule-cleaned text is typed instead.
 - **A small local model, held on a short lead.** A 2B model is fast (about 0.4 s) and private, but follows instructions loosely. So the dictation is fenced in `<dictation>` tags, the prompt carries one worked example, temperature is 0 for repeatable output, and the guard above checks every answer.
@@ -96,7 +99,7 @@ Measured on Apple M2, 16 GB, macOS 26.6.2, 2026-11-22.
 | Filler words removed                                     | 69.7%           | 89.9%            |
 | British spellings correct                                | 86.5%           | 86.5%            |
 | Trap prompts typed, not obeyed                           | 100.0%          | 100.0%           |
-| Time from letting go to text (median / slowest 5%)       | 160 ms / 415 ms | 549 ms / 1266 ms |
+| Time from letting go to text (median / slowest 5%)       | 153 ms / 362 ms | 530 ms / 1130 ms |
 
 Speech recognition alone (Parakeet, before any tidying): **6.9%** word error rate.
 
@@ -110,6 +113,8 @@ Speech recognition alone (Parakeet, before any tidying): **6.9%** word error rat
 | Aman                | Indian     | 23.3%                  | 29.0%                  |
 
 **Voice snippets:** the right result (the snippet, or nothing for look-alike sentences) in 91.7% of 144 spoken commands; set off by ordinary dictation in 0 of 240 clips.
+
+**Live text:** first words on screen 311 ms after you start speaking (median; slowest 5%: 584 ms), across 40 clips. The preview's word error rate is 2.9% on the 38 clips that fit its 8-second window, and reading costs 23.9% of speaking time (1 beat skipped while a read was still running).
 <!-- eval:end -->
 
 ### What the eval caught
@@ -120,6 +125,7 @@ Speech recognition alone (Parakeet, before any tidying): **6.9%** word error rat
 - **The AI step was not repeatable either**: at temperature 0.2, 18 of 240 clips were tidied differently between runs. At temperature 0, two consecutive runs now give identical results for all 240 clips, transcripts and final text alike.
 - **The last word was getting cut off.** Snippet commands came back as _"insert today's d"_: when audio stops straight after the last word, which is what happens when you let go of the key as you finish, the model drops it. Recordings now get half a second of silence added at the end. That is a trade-off, not a free win: it changed 32 of 240 ordinary transcripts (14 better, 18 worse, mostly a spoken "uh" disappearing), but end-to-end accuracy with AI improved slightly and the snippet hit rate rose from 84% to 92%.
 - **A misheard "um" blocked snippets.** _"Um, insert out of office"_ was heard as _"Come, insert out of office"_, so the command word was no longer first. Snippets now match anywhere in a sentence, which fixed this and made mid-sentence snippets possible. The tests also caught the words after a mid-sentence snippet being capitalised as a new sentence (_"1 Example Street By Friday"_).
+- **Live text missed its own target.** The first version re-read every 0.4 s and showed first words after 566 ms, against a target of 500 ms. Reading every 0.2 s throughout would have roughly doubled the cost, so it now reads every 0.2 s only until words appear, then every 0.4 s of new audio: first words in 311 ms, and lower overall cost than before.
 
 The Indian English result should be read with care: the frozen "Aman" clips
 score 24.7%, while earlier, different renderings of the same sentences scored
