@@ -277,7 +277,9 @@ app.whenReady().then(async () => {
   if (!fs.existsSync(SETTINGS_FILE)) openSettings(); // first run: show the settings once
 });
 
-app.on("window-all-closed", (event) => event.preventDefault()); // stay in the menu bar
+// Electron passes no event here; having a listener at all is what keeps the
+// app running in the menu bar after its windows close.
+app.on("window-all-closed", () => {});
 
 app.on("will-quit", () => {
   keys?.stop();
