@@ -38,10 +38,65 @@ function render(settings, keyChoices, mics) {
   el.britishEnglish.checked = settings.britishEnglish;
 }
 
+// ---- Snippets --------------------------------------------------------------
+// The list lives here while you edit. Only complete snippets (trigger and
+// text both filled in) are saved, so a half-typed row is never lost or saved.
+
+let snippets = [];
+const snippetList = document.getElementById("snippetList");
+
+function saveSnippets() {
+  const complete = snippets.filter((s) => s.trigger.trim() && s.text.trim());
+  window.flow.saveSettings({ snippets: complete });
+}
+
+function drawSnippets() {
+  snippetList.replaceChildren(
+    ...snippets.map((snippet, index) => {
+      const row = document.createElement("div");
+      row.className = "snippet";
+
+      const trigger = document.createElement("input");
+      trigger.placeholder = "Trigger, e.g. my sign-off";
+      trigger.value = snippet.trigger;
+      trigger.addEventListener("input", () => (snippet.trigger = trigger.value));
+      trigger.addEventListener("change", saveSnippets);
+
+      const remove = document.createElement("button");
+      remove.className = "delete";
+      remove.textContent = "Delete";
+      remove.addEventListener("click", () => {
+        snippets.splice(index, 1);
+        drawSnippets();
+        saveSnippets();
+      });
+
+      const text = document.createElement("textarea");
+      text.placeholder = "Text to type";
+      text.value = snippet.text;
+      text.addEventListener("input", () => (snippet.text = text.value));
+      text.addEventListener("change", saveSnippets);
+
+      row.append(trigger, remove, text);
+      return row;
+    }),
+  );
+}
+
+document.getElementById("addSnippet").addEventListener("click", () => {
+  snippets.push({ trigger: "", text: "" });
+  drawSnippets();
+  snippetList.lastElementChild.querySelector("input").focus();
+});
+
+// ---- Start-up ----------------------------------------------------------------
+
 async function init() {
   const { settings, keyChoices } = await window.flow.getSettings();
   const mics = await microphones();
   render(settings, keyChoices, mics);
+  snippets = settings.snippets.map((s) => ({ ...s }));
+  drawSnippets();
 
   for (const id of fields) {
     el[id].addEventListener("change", async () => {

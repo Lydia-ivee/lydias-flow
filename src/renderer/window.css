@@ -117,3 +117,47 @@ kbd {
   border-radius: 5px;
   padding: 1px 6px;
 }
+
+/* Snippets editor in Settings */
+.card-head {
+  font-weight: 600;
+}
+
+.snippet {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.snippet input,
+.snippet textarea {
+  background: var(--ink);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  font: inherit;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.snippet textarea {
+  grid-column: 1 / -1;
+  resize: vertical;
+  min-height: 52px;
+}
+
+.snippet input:focus,
+.snippet textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.snippet .delete {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  padding: 6px 10px;
+}
