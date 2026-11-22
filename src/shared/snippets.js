@@ -1,11 +1,15 @@
-// Voice snippets: say "insert my sign-off" and your saved text is typed.
+// Voice snippets: say "insert my sign-off" and your saved text is typed,
+// on its own or in the middle of a sentence:
+//
+//   "Thanks for your time today, insert my sign-off"
+//     -> "Thanks for your time today." + your sign-off
 //
 // No AI decides whether you meant a snippet. The rules are:
-//   1. What you said must start with a command word ("insert" or "snippet"),
-//      allowing one stray word before it.
-//   2. Everything after it must closely match one of your trigger phrases.
+//   1. A command word ("insert" or "snippet") anywhere in what you said...
+//   2. ...directly followed by words that closely match one of your triggers.
 // Close, not exact, because speech recognition mishears a little ("my sign
-// of" for "my sign-off"). Rule 1 means ordinary dictation can't set one off.
+// of" for "my sign-off"). If the words after "insert" match no trigger
+// ("insert a table here"), nothing happens and your words are typed as said.
 
 const COMMAND_WORDS = ["insert", "snippet"];
 const NOISE = new Set(["um", "umm", "uh", "uhh", "er", "erm", "hmm"]);
@@ -42,22 +46,84 @@ function similarity(a, b) {
   return longest === 0 ? 1 : 1 - editDistance(a, b) / longest;
 }
 
-// Returns the snippet you meant, or null if this was ordinary dictation.
-function matchSnippet(transcript, snippets) {
-  const words = normalise(transcript).split(" ");
-  // The command word may be second: a spoken "um" is sometimes heard as a
-  // real word ("Come, insert out of office"). Only one stray word is allowed.
-  const at = words.slice(0, 2).findIndex((word) => COMMAND_WORDS.includes(word));
-  if (at === -1) return null;
-  const spokenTrigger = words.slice(at + 1).join(" ");
-  if (!spokenTrigger) return null;
+// Each word of the transcript with where it sits, so a snippet can be cut out
+// of the original text exactly. "sign-off" and "today's" count as one word.
+function tokenise(transcript) {
+  return [...transcript.matchAll(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g)].map((m) => ({
+    start: m.index,
+    end: m.index + m[0].length,
+    normalised: normalise(m[0]), // "" for noise words like "um"
+  }));
+}
 
+// After the command word at `at`, try the next 1, 2, 3... words against every
+// trigger and keep the closest match. Returns { snippet, lastToken } or null.
+function bestTriggerAfter(tokens, at, triggers) {
+  const longest = Math.max(...triggers.map((t) => t.words));
   let best = null;
-  for (const snippet of snippets) {
-    const score = similarity(spokenTrigger, normalise(snippet.trigger));
-    if (score >= MIN_SIMILARITY && (!best || score > best.score)) best = { snippet, score };
+  let spoken = [];
+  for (let j = at + 1; j < tokens.length && spoken.length < longest + 1; j += 1) {
+    if (!tokens[j].normalised) continue; // skip "um"
+    spoken = [...spoken, tokens[j].normalised];
+    const said = spoken.join(" ");
+    for (const trigger of triggers) {
+      const score = similarity(said, trigger.normalised);
+      if (score >= MIN_SIMILARITY && (!best || score > best.score)) best = { snippet: trigger.snippet, lastToken: j, score };
+    }
   }
-  return best ? best.snippet : null;
+  return best;
+}
+
+// Splits what you said into spoken parts and snippets, in order:
+//   [{ text: "Thanks for your time today" }, { snippet: {...} }]
+function splitOnSnippets(transcript, snippets) {
+  const triggers = snippets
+    .map((snippet) => ({ snippet, normalised: normalise(snippet.trigger) }))
+    .filter((t) => t.normalised)
+    .map((t) => ({ ...t, words: t.normalised.split(" ").length }));
+  if (triggers.length === 0) return [{ text: transcript }];
+
+  const tokens = tokenise(transcript);
+  const parts = [];
+  let cursor = 0; // where the next spoken part starts in the original text
+  for (let i = 0; i < tokens.length; i += 1) {
+    if (!COMMAND_WORDS.includes(tokens[i].normalised)) continue;
+    const found = bestTriggerAfter(tokens, i, triggers);
+    if (!found) continue;
+
+    // The spoken part before, without the comma that led into "insert".
+    const before = transcript.slice(cursor, tokens[i].start).replace(/[\s,;:]+$/, "");
+    if (before.trim()) parts.push({ text: before.trim() });
+    parts.push({ snippet: found.snippet });
+
+    // Resume after the trigger and any punctuation straight after it.
+    const afterTrigger = transcript.slice(tokens[found.lastToken].end).match(/^[\s.,;:!?]*/)[0];
+    cursor = tokens[found.lastToken].end + afterTrigger.length;
+    i = found.lastToken;
+  }
+  const rest = transcript.slice(cursor).trim();
+  if (rest) parts.push({ text: rest });
+  return parts;
+}
+
+// The first snippet in what you said, or null if it was ordinary dictation.
+function matchSnippet(transcript, snippets) {
+  const part = splitOnSnippets(transcript, snippets).find((p) => p.snippet);
+  return part ? part.snippet : null;
+}
+
+// Puts finished parts back together. A snippet with line breaks (a sign-off,
+// an address) goes on its own line; a one-line snippet sits in the sentence.
+function joinParts(parts) {
+  let out = "";
+  let previousMultiline = false;
+  for (const { text, multiline } of parts) {
+    if (!text) continue;
+    if (out) out += multiline || previousMultiline ? "\n" : " ";
+    out += text;
+    previousMultiline = Boolean(multiline);
+  }
+  return out;
 }
 
 // Fills in {date}, {time} and {clipboard}. Anything else in braces is left alone.
@@ -82,4 +148,13 @@ function cleanSnippets(list) {
     .slice(0, 100);
 }
 
-module.exports = { COMMAND_WORDS, normalise, similarity, matchSnippet, expandPlaceholders, cleanSnippets };
+module.exports = {
+  COMMAND_WORDS,
+  normalise,
+  similarity,
+  splitOnSnippets,
+  matchSnippet,
+  joinParts,
+  expandPlaceholders,
+  cleanSnippets,
+};

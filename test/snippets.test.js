@@ -1,6 +1,14 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { normalise, similarity, matchSnippet, expandPlaceholders, cleanSnippets } = require("../src/shared/snippets");
+const {
+  normalise,
+  similarity,
+  matchSnippet,
+  splitOnSnippets,
+  joinParts,
+  expandPlaceholders,
+  cleanSnippets,
+} = require("../src/shared/snippets");
 
 const SNIPPETS = [
   { trigger: "my sign-off", text: "Best wishes,\nLydia" },
@@ -66,9 +74,46 @@ test("cleanSnippets drops broken entries and trims long ones", () => {
   assert.deepEqual(cleanSnippets("not a list"), []);
 });
 
-test("allows one stray word before the command word (a misheard 'um')", () => {
-  assert.equal(matchSnippet("Come, insert my address.", SNIPPETS).trigger, "my address");
-  assert.equal(matchSnippet("Arm, snippet meeting link", SNIPPETS).trigger, "meeting link");
-  // Two words before it is ordinary speech.
-  assert.equal(matchSnippet("Could you insert my address", SNIPPETS), null);
+const SIGN_OFF = SNIPPETS[0];
+const ADDRESS = SNIPPETS[2];
+
+test("finds a snippet at the end of a sentence", () => {
+  assert.deepEqual(splitOnSnippets("Thanks for your time today, insert my sign-off.", SNIPPETS), [
+    { text: "Thanks for your time today" },
+    { snippet: SIGN_OFF },
+  ]);
+});
+
+test("finds a snippet in the middle, keeping the words either side", () => {
+  assert.deepEqual(splitOnSnippets("Send it to me at insert my address, by Friday please.", SNIPPETS), [
+    { text: "Send it to me at" },
+    { snippet: ADDRESS },
+    { text: "by Friday please." },
+  ]);
+});
+
+test("finds two snippets in one go", () => {
+  const parts = splitOnSnippets("Insert my address. Thanks, insert my sign-off", SNIPPETS);
+  assert.deepEqual(parts, [{ snippet: ADDRESS }, { text: "Thanks" }, { snippet: SIGN_OFF }]);
+});
+
+test("mid-sentence 'insert' that matches no trigger changes nothing", () => {
+  const text = "We should insert a table of results here, then my sign-off.";
+  assert.deepEqual(splitOnSnippets(text, SNIPPETS), [{ text }]);
+});
+
+test("skips a spoken 'um' between the command word and the trigger", () => {
+  assert.equal(matchSnippet("Insert, um, my sign-off", SNIPPETS), SIGN_OFF);
+});
+
+test("joinParts puts multi-line snippets on their own line", () => {
+  assert.equal(
+    joinParts([{ text: "Thanks for today." }, { text: "Best wishes,\nLydia", multiline: true }]),
+    "Thanks for today.\nBest wishes,\nLydia",
+  );
+  assert.equal(
+    joinParts([{ text: "Send it to" }, { text: "1 Example Street" }, { text: "by Friday." }]),
+    "Send it to 1 Example Street by Friday.",
+  );
+  assert.equal(joinParts([{ text: "A" }, { text: "B\nC", multiline: true }, { text: "D" }]), "A\nB\nC\nD");
 });
