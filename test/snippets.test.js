@@ -65,3 +65,10 @@ test("cleanSnippets drops broken entries and trims long ones", () => {
   assert.deepEqual(cleaned, [{ trigger: "ok", text: "fine" }]);
   assert.deepEqual(cleanSnippets("not a list"), []);
 });
+
+test("allows one stray word before the command word (a misheard 'um')", () => {
+  assert.equal(matchSnippet("Come, insert my address.", SNIPPETS).trigger, "my address");
+  assert.equal(matchSnippet("Arm, snippet meeting link", SNIPPETS).trigger, "meeting link");
+  // Two words before it is ordinary speech.
+  assert.equal(matchSnippet("Could you insert my address", SNIPPETS), null);
+});

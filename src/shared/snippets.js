@@ -1,7 +1,8 @@
 // Voice snippets: say "insert my sign-off" and your saved text is typed.
 //
 // No AI decides whether you meant a snippet. The rules are:
-//   1. What you said must start with a command word ("insert" or "snippet").
+//   1. What you said must start with a command word ("insert" or "snippet"),
+//      allowing one stray word before it.
 //   2. Everything after it must closely match one of your trigger phrases.
 // Close, not exact, because speech recognition mishears a little ("my sign
 // of" for "my sign-off"). Rule 1 means ordinary dictation can't set one off.
@@ -44,8 +45,11 @@ function similarity(a, b) {
 // Returns the snippet you meant, or null if this was ordinary dictation.
 function matchSnippet(transcript, snippets) {
   const words = normalise(transcript).split(" ");
-  if (!COMMAND_WORDS.includes(words[0])) return null;
-  const spokenTrigger = words.slice(1).join(" ");
+  // The command word may be second: a spoken "um" is sometimes heard as a
+  // real word ("Come, insert out of office"). Only one stray word is allowed.
+  const at = words.slice(0, 2).findIndex((word) => COMMAND_WORDS.includes(word));
+  if (at === -1) return null;
+  const spokenTrigger = words.slice(at + 1).join(" ");
   if (!spokenTrigger) return null;
 
   let best = null;
