@@ -17,7 +17,10 @@ const CACHE_DIR = path.join(__dirname, ".audio-cache");
 // Returns 16 kHz mono float32 samples, the format the app's recorder produces.
 // voice: a macOS voice name (see `say -v '?'`); rate: words per minute.
 function speak(sentence, { voice, rate } = {}) {
-  const cacheFile = path.join(CACHE_DIR, `${crypto.createHash("sha256").update(`${voice}|${rate}|${sentence}`).digest("hex")}.f32`);
+  const cacheFile = path.join(
+    CACHE_DIR,
+    `${crypto.createHash("sha256").update(`${voice}|${rate}|${sentence}`).digest("hex")}.f32`,
+  );
   if (fs.existsSync(cacheFile)) {
     const bytes = fs.readFileSync(cacheFile);
     return new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length));

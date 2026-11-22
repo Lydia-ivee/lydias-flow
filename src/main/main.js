@@ -8,7 +8,18 @@
 
 const path = require("path");
 const fs = require("fs");
-const { app, BrowserWindow, Tray, Menu, ipcMain, clipboard, screen, session, systemPreferences, nativeImage } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  ipcMain,
+  clipboard,
+  screen,
+  session,
+  systemPreferences,
+  nativeImage,
+} = require("electron");
 
 const { installNetworkGuard } = require("../shared/networkGuard");
 const { toBritish } = require("../shared/ukSpelling");
@@ -95,14 +106,24 @@ function openWindow(existing, page, options) {
     existing.focus();
     return existing;
   }
-  const win = new BrowserWindow({ ...options, show: false, titleBarStyle: "hiddenInset", webPreferences: webPreferences() });
+  const win = new BrowserWindow({
+    ...options,
+    show: false,
+    titleBarStyle: "hiddenInset",
+    webPreferences: webPreferences(),
+  });
   loadPage(win, page);
   win.once("ready-to-show", () => win.show());
   return win;
 }
 
 function openSettings() {
-  settingsWindow = openWindow(settingsWindow, "settings.html", { width: 460, height: 780, minWidth: 420, minHeight: 500 });
+  settingsWindow = openWindow(settingsWindow, "settings.html", {
+    width: 460,
+    height: 780,
+    minWidth: 420,
+    minHeight: 500,
+  });
 }
 
 function openReport() {
@@ -170,7 +191,11 @@ async function handleAudio(samples) {
     let snippetsUsed = [];
     if (action === "dictate") {
       // Spoken parts are tidied; any "insert <trigger>" becomes your saved text.
-      ({ text, fillers, snippets: snippetsUsed } = await processSpeech(raw, settings, cleaner, {
+      ({
+        text,
+        fillers,
+        snippets: snippetsUsed,
+      } = await processSpeech(raw, settings, cleaner, {
         clipboard: clipboard.readText(),
       }));
     } else {

@@ -27,6 +27,7 @@ function removeFillers(text) {
 
 // Fillers tracked in the Flow Report. Phrases come before single words so
 // "you know" is counted as one filler.
+// prettier-ignore
 const TRACKED = [
   "you know", "i mean", "sort of", "kind of",
   "um", "uh", "er", "erm", "hmm", "like", "basically", "literally", "actually", "so yeah",

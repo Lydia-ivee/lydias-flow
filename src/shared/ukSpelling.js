@@ -18,6 +18,7 @@ const OUR_ENDINGS = ["", "s", "ed", "ing", "ful", "fully", "less", "ite", "ites"
 
 const FAMILIES = [
   // -or -> -our
+  // prettier-ignore
   ...[
     "color", "favor", "honor", "labor", "neighbor", "behavior", "flavor",
     "harbor", "humor", "rumor", "vapor", "vigor", "rigor", "armor",
@@ -27,6 +28,7 @@ const FAMILIES = [
 
   // -er -> -re. British drops the final e before -ed and -ing:
   // centered -> centred, centering -> centring (not "centreed").
+  // prettier-ignore
   ...[
     "center", "theater", "fiber", "liter", "kilometer", "centimeter",
     "millimeter", "somber", "specter", "saber", "luster", "meager", "caliber",
@@ -86,7 +88,17 @@ const FAMILIES = [
 ];
 
 // Words ending in -ize where "ize" is not a suffix you can swap.
-const IZE_EXCEPTIONS = new Set(["size", "prize", "seize", "capsize", "maize", "baize", "downsize", "oversize", "resize"]);
+const IZE_EXCEPTIONS = new Set([
+  "size",
+  "prize",
+  "seize",
+  "capsize",
+  "maize",
+  "baize",
+  "downsize",
+  "oversize",
+  "resize",
+]);
 
 function buildWordMap() {
   const map = new Map();

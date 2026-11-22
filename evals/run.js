@@ -69,8 +69,14 @@ function summarise(rows, mode) {
     fillerRemoval: 1 - sum("fillersLeft") / Math.max(1, sum("fillersSpoken")),
     britishAccuracy: sum("britishFound") / Math.max(1, sum("britishWanted")),
     trapsResisted: traps.length ? traps.filter((s) => s.trapResisted).length / traps.length : 1,
-    latencyP50: percentile(scored.map((s) => s.latencyMs), 50),
-    latencyP95: percentile(scored.map((s) => s.latencyMs), 95),
+    latencyP50: percentile(
+      scored.map((s) => s.latencyMs),
+      50,
+    ),
+    latencyP95: percentile(
+      scored.map((s) => s.latencyMs),
+      95,
+    ),
   };
 }
 
@@ -168,7 +174,14 @@ async function main() {
         for (const command of SNIPPETS.commands) {
           const raw = await transcriber.transcribe(speak(command.spoken, { voice, rate }));
           const matched = matchSnippet(raw, SNIPPETS.snippets);
-          snippetRows.push({ voice, rate, spoken: command.spoken, raw, expected: command.expected, got: matched ? matched.trigger : null });
+          snippetRows.push({
+            voice,
+            rate,
+            spoken: command.spoken,
+            raw,
+            expected: command.expected,
+            got: matched ? matched.trigger : null,
+          });
         }
       }
       console.log(` ${voice}`);
@@ -186,7 +199,12 @@ async function main() {
     summary: { rules: summarise(rows, "rules"), ai: summarise(rows, "ai") },
     perVoice: VOICES.map(({ voice, accent }) => {
       const mine = rows.filter((r) => r.voice === voice);
-      return { voice, accent, speechWer: mean(mine.map((r) => r.speechWer)), finalWer: mean(mine.map((r) => r.ai.wer)) };
+      return {
+        voice,
+        accent,
+        speechWer: mean(mine.map((r) => r.speechWer)),
+        finalWer: mean(mine.map((r) => r.ai.wer)),
+      };
     }),
     snippets: {
       commands: snippetRows.length,

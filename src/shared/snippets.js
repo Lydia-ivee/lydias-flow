@@ -68,7 +68,8 @@ function bestTriggerAfter(tokens, at, triggers) {
     const said = spoken.join(" ");
     for (const trigger of triggers) {
       const score = similarity(said, trigger.normalised);
-      if (score >= MIN_SIMILARITY && (!best || score > best.score)) best = { snippet: trigger.snippet, lastToken: j, score };
+      if (score >= MIN_SIMILARITY && (!best || score > best.score))
+        best = { snippet: trigger.snippet, lastToken: j, score };
     }
   }
   return best;

@@ -18,11 +18,16 @@ class Cleaner {
   async start() {
     this.port = await findFreePort();
     this.child = startProcess(this.binary, [
-      "-m", this.model,
-      "--host", "127.0.0.1",
-      "--port", String(this.port),
-      "-c", "4096", // context size: plenty for a dictation
-      "-ngl", "99", // put every layer on the GPU
+      "-m",
+      this.model,
+      "--host",
+      "127.0.0.1",
+      "--port",
+      String(this.port),
+      "-c",
+      "4096", // context size: plenty for a dictation
+      "-ngl",
+      "99", // put every layer on the GPU
       "--jinja", // use the chat template inside the model file
     ]);
     const healthy = async () => (await fetch(this.url("/health"))).ok;
@@ -61,7 +66,10 @@ class Cleaner {
   }
 
   async edit(selectedText, instruction) {
-    const output = await this.chat(buildEditMessages(selectedText, instruction), Math.max(128, selectedText.length * 2));
+    const output = await this.chat(
+      buildEditMessages(selectedText, instruction),
+      Math.max(128, selectedText.length * 2),
+    );
     return tidyModelOutput(output) || selectedText;
   }
 
