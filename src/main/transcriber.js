@@ -11,13 +11,18 @@ const sherpa = require("sherpa-onnx-node");
 
 const TRAILING_SILENCE_SECONDS = 0.5;
 
+/** @typedef {import("../shared/types").EngineDirs} EngineDirs */
+
 class Transcriber {
+  /** @param {Pick<EngineDirs, "modelsDir">} dirs */
   constructor({ modelsDir }) {
     this.modelDir = path.join(modelsDir, "parakeet");
+    /** @type {import("sherpa-onnx-node").OfflineRecognizer | null} */
     this.recognizer = null;
   }
 
   async start() {
+    /** @param {string} file */
     const model = (file) => path.join(this.modelDir, file);
     this.recognizer = await sherpa.OfflineRecognizer.createAsync({
       featConfig: { sampleRate: 16000, featureDim: 80 },
@@ -35,7 +40,13 @@ class Transcriber {
   }
 
   // samples: Float32Array of mono audio at 16 kHz (what the recorder produces).
+  /**
+   * @param {Float32Array} samples
+   * @param {number} [sampleRate]
+   * @returns {Promise<string>}
+   */
   async transcribe(samples, sampleRate = 16000) {
+    if (!this.recognizer) throw new Error("Transcriber not started: call start() first");
     // Add half a second of silence at the end. People let go of the key the
     // moment they finish speaking, and without trailing silence the model
     // drops the last word ("insert today's d"). Found by the eval suite.

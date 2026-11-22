@@ -26,7 +26,11 @@ test("filler counts come from the raw transcript", async () => {
 });
 
 test("a failing model still types the rule-cleaned words", async () => {
-  const broken = { clean: async () => { throw new Error("server down"); } };
+  const broken = {
+    clean: async () => {
+      throw new Error("server down");
+    },
+  };
   const result = await processDictation(RAW, { cleanup: true, britishEnglish: false }, broken);
   assert.equal(result.text, "So basically I want to organize the color of the center page, you know, before Friday.");
 });
@@ -55,7 +59,11 @@ test("a one-line snippet sits inside the sentence", async () => {
 });
 
 test("spoken parts are tidied; snippet text is never changed", async () => {
-  const settings = { ...settingsWithSnippets, cleanup: true, snippets: [{ trigger: "color code", text: "color: #8b7cff" }] };
+  const settings = {
+    ...settingsWithSnippets,
+    cleanup: true,
+    snippets: [{ trigger: "color code", text: "color: #8b7cff" }],
+  };
   const tidy = { clean: async (text) => ({ text: `${text}.`, usedModel: true }) };
   const result = await processSpeech("Um, here is the insert color code", settings, tidy);
   // "colour" rules apply to what you said, never to your saved snippet.

@@ -8,7 +8,18 @@
 
 const path = require("path");
 const fs = require("fs");
-const { app, BrowserWindow, Tray, Menu, ipcMain, clipboard, screen, session, systemPreferences, nativeImage } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  ipcMain,
+  clipboard,
+  screen,
+  session,
+  systemPreferences,
+  nativeImage,
+} = require("electron");
 
 const { installNetworkGuard } = require("../shared/networkGuard");
 const { toBritish } = require("../shared/ukSpelling");
@@ -29,21 +40,40 @@ const SETTINGS_FILE = path.join(app.getPath("userData"), "settings.json");
 const STATS_FILE = path.join(app.getPath("userData"), "flow-stats.jsonl");
 const MIN_AUDIO_SECONDS = 0.3; // shorter than this is an accidental tap
 
+/** @typedef {import("../shared/types").Settings} Settings */
+/** @typedef {import("../shared/types").StatsInput} StatsInput */
+/** @typedef {import("./keyListener").KeyEvents} KeyEvents */
+
+// settings, transcriber, cleaner and pill are set in app.whenReady, before any
+// key press or window message can reach the code that uses them.
+/** @type {Settings} */
 let settings;
+/** @type {Transcriber} */
 let transcriber;
+/** @type {Cleaner} */
 let cleaner;
+/** @type {KeyEvents | undefined} */
 let keys;
+/** @type {Tray | undefined} */
 let tray;
+/** @type {BrowserWindow} */
 let pill;
+/** @type {BrowserWindow | undefined} */
 let settingsWindow;
+/** @type {BrowserWindow | undefined} */
 let reportWindow;
 let busy = false; // one dictation at a time
+/** @type {"dictate" | "edit" | null} */
 let mode = null; // "dictate" or "edit" while a key is held
 
 const paster = createPaster({ clipboard });
 
 // ---- Windows ---------------------------------------------------------------
 
+/**
+ * @param {BrowserWindow} win
+ * @param {string} page
+ */
 function loadPage(win, page) {
   win.loadFile(path.join(__dirname, "..", "renderer", page));
 }
@@ -74,6 +104,10 @@ function createPill() {
   loadPage(pill, "pill.html");
 }
 
+/**
+ * @param {string} state
+ * @param {string} [detail]
+ */
 function showPill(state, detail = "") {
   // Bottom centre of whichever screen the mouse is on.
   const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -89,20 +123,36 @@ function hidePillSoon(ms = 900) {
   }, ms);
 }
 
+/**
+ * @param {BrowserWindow | undefined} existing
+ * @param {string} page
+ * @param {import("electron").BrowserWindowConstructorOptions} options
+ * @returns {BrowserWindow}
+ */
 function openWindow(existing, page, options) {
   if (existing && !existing.isDestroyed()) {
     existing.show();
     existing.focus();
     return existing;
   }
-  const win = new BrowserWindow({ ...options, show: false, titleBarStyle: "hiddenInset", webPreferences: webPreferences() });
+  const win = new BrowserWindow({
+    ...options,
+    show: false,
+    titleBarStyle: "hiddenInset",
+    webPreferences: webPreferences(),
+  });
   loadPage(win, page);
   win.once("ready-to-show", () => win.show());
   return win;
 }
 
 function openSettings() {
-  settingsWindow = openWindow(settingsWindow, "settings.html", { width: 460, height: 780, minWidth: 420, minHeight: 500 });
+  settingsWindow = openWindow(settingsWindow, "settings.html", {
+    width: 460,
+    height: 780,
+    minWidth: 420,
+    minHeight: 500,
+  });
 }
 
 function openReport() {
@@ -151,6 +201,7 @@ function startKeys() {
 
 // ---- The dictation itself ------------------------------------------------------
 
+/** @param {Float32Array} samples */
 async function handleAudio(samples) {
   const action = mode;
   mode = null;
@@ -166,11 +217,17 @@ async function handleAudio(samples) {
     }
 
     let text;
+    /** @type {import("../shared/types").FillerCounts} */
     let fillers = {};
+    /** @type {string[]} */
     let snippetsUsed = [];
     if (action === "dictate") {
       // Spoken parts are tidied; any "insert <trigger>" becomes your saved text.
-      ({ text, fillers, snippets: snippetsUsed } = await processSpeech(raw, settings, cleaner, {
+      ({
+        text,
+        fillers,
+        snippets: snippetsUsed,
+      } = await processSpeech(raw, settings, cleaner, {
         clipboard: clipboard.readText(),
       }));
     } else {
@@ -191,7 +248,7 @@ async function handleAudio(samples) {
     recordStats({ audioMs: (samples.length / 16000) * 1000, words, fillers, mode: usedSnippets ? "snippet" : action });
     showPill("done", usedSnippets ? `Inserted “${snippetsUsed.join("”, “")}”` : "");
   } catch (err) {
-    console.error("Dictation failed:", err.message);
+    console.error("Dictation failed:", err instanceof Error ? err.message : String(err));
     showPill("error", "Something went wrong");
   } finally {
     busy = false;
@@ -199,6 +256,7 @@ async function handleAudio(samples) {
   }
 }
 
+/** @param {StatsInput} entry */
 function recordStats(entry) {
   fs.appendFileSync(STATS_FILE, `${JSON.stringify(makeEntry(entry))}\n`);
 }
@@ -245,14 +303,19 @@ app.whenReady().then(async () => {
   try {
     await Promise.all([transcriber.start(), cleaner.start()]);
   } catch (err) {
-    console.error("Could not start the local engines. Did you run `npm run setup`?", err.message);
+    console.error(
+      "Could not start the local engines. Did you run `npm run setup`?",
+      err instanceof Error ? err.message : String(err),
+    );
     openSettings();
   }
   startKeys();
   if (!fs.existsSync(SETTINGS_FILE)) openSettings(); // first run: show the settings once
 });
 
-app.on("window-all-closed", (event) => event.preventDefault()); // stay in the menu bar
+// Stay in the menu bar. Listening is enough to stop the default quit: this event
+// passes no argument, so the old `event.preventDefault()` threw a TypeError.
+app.on("window-all-closed", () => {});
 
 app.on("will-quit", () => {
   keys?.stop();

@@ -16,21 +16,26 @@
 // British English) are never touched.
 const OUR_ENDINGS = ["", "s", "ed", "ing", "ful", "fully", "less", "ite", "ites", "able", "ably", "er", "ers"];
 
+/** @typedef {[us: string, uk: string, endings: string[]]} Family */
+
+/** @type {Family[]} */
 const FAMILIES = [
   // -or -> -our
+  // prettier-ignore
   ...[
     "color", "favor", "honor", "labor", "neighbor", "behavior", "flavor",
     "harbor", "humor", "rumor", "vapor", "vigor", "rigor", "armor",
     "endeavor", "odor", "valor", "tumor", "parlor", "clamor", "candor",
     "fervor", "savor", "splendor",
-  ].map((us) => [us, us.replace(/or$/, "our"), OUR_ENDINGS]),
+  ].map(/** @returns {Family} */ (us) => [us, us.replace(/or$/, "our"), OUR_ENDINGS]),
 
   // -er -> -re. British drops the final e before -ed and -ing:
   // centered -> centred, centering -> centring (not "centreed").
+  // prettier-ignore
   ...[
     "center", "theater", "fiber", "liter", "kilometer", "centimeter",
     "millimeter", "somber", "specter", "saber", "luster", "meager", "caliber",
-  ].flatMap((us) => {
+  ].flatMap(/** @returns {Family[]} */ (us) => {
     const uk = us.replace(/er$/, "re");
     const ukWithoutE = uk.slice(0, -1);
     return [
@@ -86,9 +91,21 @@ const FAMILIES = [
 ];
 
 // Words ending in -ize where "ize" is not a suffix you can swap.
-const IZE_EXCEPTIONS = new Set(["size", "prize", "seize", "capsize", "maize", "baize", "downsize", "oversize", "resize"]);
+const IZE_EXCEPTIONS = new Set([
+  "size",
+  "prize",
+  "seize",
+  "capsize",
+  "maize",
+  "baize",
+  "downsize",
+  "oversize",
+  "resize",
+]);
 
+/** @returns {Map<string, string>} */
 function buildWordMap() {
+  /** @type {Map<string, string>} */
   const map = new Map();
   for (const [us, uk, endings] of FAMILIES) {
     for (const ending of endings) {
@@ -105,8 +122,13 @@ const WORD_MAP = buildWordMap();
 const IZE = /^(\w+?)iz(e|es|ed|ing|ation|ations|er|ers)$/;
 const YZE = /^(\w+?)yz(e|es|ed|ing|er|ers)$/;
 
+/**
+ * @param {string} word
+ * @returns {string}
+ */
 function convertLowercaseWord(word) {
-  if (WORD_MAP.has(word)) return WORD_MAP.get(word);
+  // has() has just confirmed the entry, so get() cannot be undefined here.
+  if (WORD_MAP.has(word)) return /** @type {string} */ (WORD_MAP.get(word));
 
   const ize = word.match(IZE);
   if (ize) {
@@ -123,12 +145,21 @@ function convertLowercaseWord(word) {
 }
 
 // Keep the original capitalisation: color -> colour, Color -> Colour, COLOR -> COLOUR.
+/**
+ * @param {string} original
+ * @param {string} replacement
+ * @returns {string}
+ */
 function matchCase(original, replacement) {
   if (original === original.toUpperCase() && original.length > 1) return replacement.toUpperCase();
   if (original[0] === original[0].toUpperCase()) return replacement[0].toUpperCase() + replacement.slice(1);
   return replacement;
 }
 
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 function toBritish(text) {
   return text.replace(/[A-Za-z]+/g, (word) => {
     const converted = convertLowercaseWord(word.toLowerCase());

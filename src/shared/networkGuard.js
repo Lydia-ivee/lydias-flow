@@ -9,6 +9,10 @@ const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const LOCAL_PROTOCOLS = new Set(["file:", "devtools:", "data:", "blob:"]);
 const NETWORK_PROTOCOLS = new Set(["http:", "https:", "ws:", "wss:"]);
 
+/**
+ * @param {string} url
+ * @returns {boolean}
+ */
 function isAllowedUrl(url) {
   let parsed;
   try {
@@ -22,6 +26,10 @@ function isAllowedUrl(url) {
 }
 
 // Electron hook: called for every request any window makes.
+/**
+ * @param {import("electron").Session} session
+ * @param {(url: string) => void} [onBlocked]
+ */
 function installNetworkGuard(session, onBlocked = () => {}) {
   session.webRequest.onBeforeRequest((details, callback) => {
     const allowed = isAllowedUrl(details.url);
