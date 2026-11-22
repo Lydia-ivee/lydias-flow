@@ -12,11 +12,10 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, clipboard, screen, session, sys
 
 const { installNetworkGuard } = require("../shared/networkGuard");
 const { toBritish } = require("../shared/ukSpelling");
-const { matchSnippet, expandPlaceholders } = require("../shared/snippets");
 const { makeEntry, wordCount, summarise, parseLines } = require("../shared/stats");
 const { Transcriber } = require("./transcriber");
 const { Cleaner } = require("./cleaner");
-const { processDictation } = require("./pipeline");
+const { processSpeech } = require("./pipeline");
 const { createPaster } = require("./paste");
 const { startKeyListener } = require("./keyListener");
 const { loadSettings, saveSettings, KEY_CHOICES } = require("./settings");
@@ -168,14 +167,12 @@ async function handleAudio(samples) {
 
     let text;
     let fillers = {};
-    let kind = action;
-    const snippet = action === "dictate" ? matchSnippet(raw, settings.snippets) : null;
-    if (snippet) {
-      // Your saved text, typed exactly as saved: no AI, no spelling changes.
-      text = expandPlaceholders(snippet.text, { clipboard: clipboard.readText() });
-      kind = "snippet";
-    } else if (action === "dictate") {
-      ({ text, fillers } = await processDictation(raw, settings, cleaner));
+    let snippetsUsed = [];
+    if (action === "dictate") {
+      // Spoken parts are tidied; any "insert <trigger>" becomes your saved text.
+      ({ text, fillers, snippets: snippetsUsed } = await processSpeech(raw, settings, cleaner, {
+        clipboard: clipboard.readText(),
+      }));
     } else {
       // Edit mode: the key is released now, so Cmd+C arrives as plain Cmd+C.
       const selected = await paster.copySelection();
@@ -188,10 +185,11 @@ async function handleAudio(samples) {
     }
 
     await paster.pasteText(text);
-    // For a snippet, count the words you said, not the saved text, so speaking speed stays honest.
-    const words = wordCount(kind === "snippet" ? raw : text);
-    recordStats({ audioMs: (samples.length / 16000) * 1000, words, fillers, mode: kind });
-    showPill("done", kind === "snippet" ? `Inserted “${snippet.trigger}”` : "");
+    // With snippets, count the words you said, not the saved text, so speaking speed stays honest.
+    const usedSnippets = snippetsUsed.length > 0;
+    const words = wordCount(usedSnippets ? raw : text);
+    recordStats({ audioMs: (samples.length / 16000) * 1000, words, fillers, mode: usedSnippets ? "snippet" : action });
+    showPill("done", usedSnippets ? `Inserted “${snippetsUsed.join("”, “")}”` : "");
   } catch (err) {
     console.error("Dictation failed:", err.message);
     showPill("error", "Something went wrong");
