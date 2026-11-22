@@ -1,4 +1,5 @@
-# Runs on every push and pull request, on a real Apple Silicon Mac.
+# Runs on every pull request and every push to main, on a real Apple Silicon Mac.
+# (Not on every branch push too: that would run twice for each pull request.)
 #
 # The end-to-end engine test is skipped here because it needs ~1.9 GB of
 # models; everything else runs, including compiling the Swift key listener.
@@ -7,6 +8,7 @@ name: Checks
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 # Read-only: this workflow can look at the code, never change it.
