@@ -9,6 +9,8 @@
 const path = require("path");
 const sherpa = require("sherpa-onnx-node");
 
+const TRAILING_SILENCE_SECONDS = 0.5;
+
 class Transcriber {
   constructor({ modelsDir }) {
     this.modelDir = path.join(modelsDir, "parakeet");
@@ -34,8 +36,14 @@ class Transcriber {
 
   // samples: Float32Array of mono audio at 16 kHz (what the recorder produces).
   async transcribe(samples, sampleRate = 16000) {
+    // Add half a second of silence at the end. People let go of the key the
+    // moment they finish speaking, and without trailing silence the model
+    // drops the last word ("insert today's d"). Found by the eval suite.
+    const padded = new Float32Array(samples.length + Math.round(sampleRate * TRAILING_SILENCE_SECONDS));
+    padded.set(samples);
+
     const stream = this.recognizer.createStream();
-    stream.acceptWaveform({ samples, sampleRate });
+    stream.acceptWaveform({ samples: padded, sampleRate });
     await this.recognizer.decodeAsync(stream);
     return this.recognizer.getResult(stream).text.trim();
   }
