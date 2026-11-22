@@ -12,6 +12,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, clipboard, screen, session, sys
 
 const { installNetworkGuard } = require("../shared/networkGuard");
 const { toBritish } = require("../shared/ukSpelling");
+const { matchSnippet, expandPlaceholders } = require("../shared/snippets");
 const { makeEntry, wordCount, summarise, parseLines } = require("../shared/stats");
 const { Transcriber } = require("./transcriber");
 const { Cleaner } = require("./cleaner");
@@ -102,7 +103,7 @@ function openWindow(existing, page, options) {
 }
 
 function openSettings() {
-  settingsWindow = openWindow(settingsWindow, "settings.html", { width: 440, height: 600, resizable: false });
+  settingsWindow = openWindow(settingsWindow, "settings.html", { width: 460, height: 780, minWidth: 420, minHeight: 500 });
 }
 
 function openReport() {
@@ -167,7 +168,13 @@ async function handleAudio(samples) {
 
     let text;
     let fillers = {};
-    if (action === "dictate") {
+    let kind = action;
+    const snippet = action === "dictate" ? matchSnippet(raw, settings.snippets) : null;
+    if (snippet) {
+      // Your saved text, typed exactly as saved: no AI, no spelling changes.
+      text = expandPlaceholders(snippet.text, { clipboard: clipboard.readText() });
+      kind = "snippet";
+    } else if (action === "dictate") {
       ({ text, fillers } = await processDictation(raw, settings, cleaner));
     } else {
       // Edit mode: the key is released now, so Cmd+C arrives as plain Cmd+C.
@@ -181,8 +188,10 @@ async function handleAudio(samples) {
     }
 
     await paster.pasteText(text);
-    recordStats({ audioMs: (samples.length / 16000) * 1000, words: wordCount(text), fillers, mode: action });
-    showPill("done");
+    // For a snippet, count the words you said, not the saved text, so speaking speed stays honest.
+    const words = wordCount(kind === "snippet" ? raw : text);
+    recordStats({ audioMs: (samples.length / 16000) * 1000, words, fillers, mode: kind });
+    showPill("done", kind === "snippet" ? `Inserted “${snippet.trigger}”` : "");
   } catch (err) {
     console.error("Dictation failed:", err.message);
     showPill("error", "Something went wrong");
@@ -211,9 +220,10 @@ ipcMain.on("pill:mic-error", () => {
 });
 ipcMain.handle("settings:get", () => ({ settings, keyChoices: KEY_CHOICES }));
 ipcMain.handle("settings:save", (_event, next) => {
-  const keysChanged = next.dictateKey !== settings.dictateKey || next.editKey !== settings.editKey;
-  settings = saveSettings(SETTINGS_FILE, next);
-  if (keysChanged) startKeys();
+  const before = settings;
+  // Merge, so a window that sends only some fields never wipes the others.
+  settings = saveSettings(SETTINGS_FILE, { ...settings, ...next });
+  if (settings.dictateKey !== before.dictateKey || settings.editKey !== before.editKey) startKeys();
   return settings;
 });
 ipcMain.handle("report:get", () => readReport());
