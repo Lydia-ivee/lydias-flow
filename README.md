@@ -8,8 +8,6 @@ Hold a key, speak, let go: your words are transcribed, tidied up and typed
 wherever your cursor is. Select some text, hold the other key and say how to
 change it. No account, no cloud, no audio leaving your machine.
 
-> Demo clip coming soon.
-
 ## What it does
 
 - **Dictate anywhere.** Hold `fn` (or a key you choose), speak, release. Text appears at your cursor in any app: email, Slack, a browser, a code editor.
