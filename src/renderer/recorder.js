@@ -11,7 +11,9 @@ const recorder = (() => {
   let processor = null;
   let chunks = [];
 
-  async function start(microphoneId, onLevel) {
+  // onLevel(loudness) drives the pill's bars; onChunk(samples) streams audio to
+  // the live preview while recording. Both are called for every block.
+  async function start(microphoneId, onLevel, onChunk) {
     chunks = [];
     stream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -26,11 +28,13 @@ const recorder = (() => {
     context = new AudioContext({ sampleRate: 16000 });
     const source = context.createMediaStreamSource(stream);
     // ScriptProcessor is old but simple: it hands us each block of samples.
-    processor = context.createScriptProcessor(4096, 1, 1);
+    // 2048 samples is 0.128s at 16 kHz: small enough for a responsive preview.
+    processor = context.createScriptProcessor(2048, 1, 1);
     processor.onaudioprocess = (event) => {
       const block = new Float32Array(event.inputBuffer.getChannelData(0));
       chunks.push(block);
       onLevel(rms(block));
+      onChunk?.(block);
     };
     source.connect(processor);
     processor.connect(context.destination);

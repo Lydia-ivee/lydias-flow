@@ -16,6 +16,7 @@
  * @property {string} editKey one of KEY_CHOICES, never the same as dictateKey
  * @property {boolean} cleanup tidy text with the local AI model
  * @property {boolean} britishEnglish
+ * @property {boolean} liveText show words in the pill while speaking
  * @property {Snippet[]} snippets
  */
 

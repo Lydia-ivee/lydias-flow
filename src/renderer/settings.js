@@ -8,7 +8,7 @@ const KEY_NAMES = {
   rightControl: "Right Control ⌃",
 };
 
-const fields = ["dictateKey", "editKey", "microphoneId", "cleanup", "britishEnglish"];
+const fields = ["dictateKey", "editKey", "microphoneId", "cleanup", "britishEnglish", "liveText"];
 const el = Object.fromEntries(fields.map((id) => [id, document.getElementById(id)]));
 
 function fillSelect(select, options, selected) {
@@ -36,6 +36,7 @@ function render(settings, keyChoices, mics) {
   fillSelect(el.microphoneId, mics, settings.microphoneId);
   el.cleanup.checked = settings.cleanup;
   el.britishEnglish.checked = settings.britishEnglish;
+  el.liveText.checked = settings.liveText;
 }
 
 // ---- Snippets --------------------------------------------------------------
@@ -106,6 +107,7 @@ async function init() {
         microphoneId: el.microphoneId.value,
         cleanup: el.cleanup.checked,
         britishEnglish: el.britishEnglish.checked,
+        liveText: el.liveText.checked,
       };
       // Main may adjust the values (e.g. two actions on one key), so redraw from its answer.
       render(await window.flow.saveSettings(next), keyChoices, mics);

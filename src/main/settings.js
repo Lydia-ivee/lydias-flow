@@ -14,6 +14,7 @@ const DEFAULTS = {
   editKey: "rightOption",
   cleanup: true, // tidy text with the local AI model
   britishEnglish: true,
+  liveText: true, // show your words in the pill while you speak
   // Say "insert today's date". One example to start with; edit them in Settings.
   snippets: [{ trigger: "today's date", text: "{date}" }],
 };
@@ -34,6 +35,7 @@ function withDefaults(saved = {}) {
   if (typeof saved.editKey === "string" && KEY_CHOICES.includes(saved.editKey)) settings.editKey = saved.editKey;
   if (typeof saved.cleanup === "boolean") settings.cleanup = saved.cleanup;
   if (typeof saved.britishEnglish === "boolean") settings.britishEnglish = saved.britishEnglish;
+  if (typeof saved.liveText === "boolean") settings.liveText = saved.liveText;
   // The two actions cannot share a key.
   // find() always succeeds with five choices; the fallback only satisfies the type.
   if (settings.editKey === settings.dictateKey)

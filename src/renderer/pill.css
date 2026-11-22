@@ -78,3 +78,15 @@ body {
 .pill[data-state="error"] .label {
   color: var(--warn);
 }
+
+/* Live text: the words heard so far, in place of the "Listening" label. */
+.label {
+  max-width: 360px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.pill.live .label {
+  font-weight: 400;
+  color: var(--text);
+}
