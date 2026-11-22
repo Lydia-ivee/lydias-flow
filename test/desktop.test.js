@@ -57,3 +57,10 @@ test("settings never give both actions the same key", () => {
   const clash = withDefaults({ dictateKey: "rightOption", editKey: "rightOption" });
   assert.notEqual(clash.dictateKey, clash.editKey);
 });
+
+test("settings keep valid snippets and start with one example", () => {
+  assert.equal(withDefaults().snippets.length, 1);
+  const saved = withDefaults({ snippets: [{ trigger: "my sign-off", text: "Best,\nLydia" }, { trigger: "", text: "x" }] });
+  assert.deepEqual(saved.snippets, [{ trigger: "my sign-off", text: "Best,\nLydia" }]);
+  assert.deepEqual(withDefaults({ snippets: [] }).snippets, []); // deleting them all sticks
+});

@@ -1,6 +1,7 @@
 // User settings, stored as a small JSON file in the app's data folder.
 
 const fs = require("fs");
+const { cleanSnippets } = require("../shared/snippets");
 
 const KEY_CHOICES = ["fn", "rightOption", "rightCommand", "rightShift", "rightControl"];
 
@@ -10,12 +11,15 @@ const DEFAULTS = {
   editKey: "rightOption",
   cleanup: true, // tidy text with the local AI model
   britishEnglish: true,
+  // Say "insert today's date". One example to start with; edit them in Settings.
+  snippets: [{ trigger: "today's date", text: "{date}" }],
 };
 
 // Merge saved values over the defaults, ignoring anything unknown or invalid,
 // so a hand-edited or old settings file can never break the app.
 function withDefaults(saved = {}) {
-  const settings = { ...DEFAULTS };
+  const settings = { ...DEFAULTS, snippets: DEFAULTS.snippets.map((s) => ({ ...s })) };
+  if (saved.snippets !== undefined) settings.snippets = cleanSnippets(saved.snippets);
   if (typeof saved.microphoneId === "string") settings.microphoneId = saved.microphoneId;
   if (KEY_CHOICES.includes(saved.dictateKey)) settings.dictateKey = saved.dictateKey;
   if (KEY_CHOICES.includes(saved.editKey)) settings.editKey = saved.editKey;
